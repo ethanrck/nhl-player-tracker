@@ -329,6 +329,7 @@
     <script>
         // Your deployed Vercel URL
         const API_BASE_URL = 'https://nhl-player-tracker.vercel.app/api/nhl';
+        const CACHED_DATA_URL = 'https://nhl-player-tracker.vercel.app/api/get-data';
         
         let topPlayersData = [];
         let allPlayerGameLogs = {};
@@ -457,50 +458,53 @@
         function updateAllHitRates() {
             const statType = document.getElementById('statType').value;
             const lineValue = parseFloat(document.getElementById('lineValue').value);
+            const topCount = parseInt(document.getElementById('topPlayers').value);
 
-            // Calculate hit rates for all players
-            const playersWithHitRates = topPlayersData.map(player => {
-                const gameLog = allPlayerGameLogs[player.playerId];
-                if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
-                    return { player, hitRate: -1, hits: 0, total: 0 };
-                }
-
-                // Use up to 10 games, or however many they've played
-                const games = gameLog.gameLog.slice(0, 10);
-                let hits = 0;
-
-                // Debug first player's games
-                if (player.playerId === topPlayersData[0].playerId) {
-                    console.log('First player games:', {
-                        name: player.skaterFullName,
-                        totalGames: gameLog.gameLog.length,
-                        last10: games.length,
-                        sampleGame: games[0]
-                    });
-                }
-
-                games.forEach(game => {
-                    let statValue;
-                    switch(statType) {
-                        case 'points':
-                            statValue = game.points || 0;
-                            break;
-                        case 'goals':
-                            statValue = game.goals || 0;
-                            break;
-                        case 'assists':
-                            statValue = game.assists || 0;
-                            break;
-                        case 'shots':
-                            statValue = game.shots || 0;
-                            break;
+            // Calculate hit rates for all players WHO HAVE GAME LOGS
+            const playersWithHitRates = topPlayersData
+                .filter(player => allPlayerGameLogs[player.playerId]) // Only players with game logs
+                .map(player => {
+                    const gameLog = allPlayerGameLogs[player.playerId];
+                    if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
+                        return { player, hitRate: -1, hits: 0, total: 0 };
                     }
-                    if (statValue > lineValue) hits++;
-                });
 
-                const hitRate = games.length > 0 ? (hits / games.length) * 100 : -1;
-                return { player, hitRate, hits, total: games.length };
-            });
+                    // Use up to 10 games, or however many they've played
+                    const games = gameLog.gameLog.slice(0, 10);
+                    let hits = 0;
+
+                    // Debug first player's games
+                    if (player.playerId === topPlayersData[0].playerId) {
+                        console.log('First player games:', {
+                            name: player.skaterFullName,
+                            totalGames: gameLog.gameLog.length,
+                            last10: games.length,
+                            sampleGame: games[0]
+                        });
+                    }
+
+                    games.forEach(game => {
+                        let statValue;
+                        switch(statType) {
+                            case 'points':
+                                statValue = game.points || 0;
+                                break;
+                            case 'goals':
+                                statValue = game.goals || 0;
+                                break;
+                            case 'assists':
+                                statValue = game.assists || 0;
+                                break;
+                            case 'shots':
+                                statValue = game.shots || 0;
+                                break;
+                        }
+                        if (statValue > lineValue) hits++;
+                    });
+
+                    const hitRate = games.length > 0 ? (hits / games.length) * 100 : -1;
+                    return { player, hitRate, hits, total: games.length };
+                });
 
             // Sort by hit rate (highest first), then by hits, then by total games
             playersWithHitRates.sort((a, b) => {
@@ -517,8 +521,8 @@
                 if (b.hits !== a.hits) {
                     return b.hits - a.hits;
                 }
-                // If still tied, sort by games played (most first)
-                return b.total - a.total;
+                // If still tied, sort by total season points
+                return (b.player.points || 0) - (a.player.points || 0);
             });
 
             // Debug: Log top 5 players to verify sorting
@@ -526,12 +530,16 @@
                 name: p.player.skaterFullName,
                 hitRate: p.hitRate === -1 ? 'No data' : p.hitRate.toFixed(1) + '%',
                 hits: p.hits,
-                total: p.total
+                total: p.total,
+                seasonPoints: p.player.points
             })));
+
+            // Only show the top X players based on dropdown
+            const playersToShow = playersWithHitRates.slice(0, topCount);
 
             // Update the display with sorted players and their hit rates
             const container = document.getElementById('playersContainer');
-            let html = playersWithHitRates.map(({ player, hitRate, hits, total }, index) => {
+            let html = playersToShow.map(({ player, hitRate, hits, total }, index) => {
                 const name = player.skaterFullName || 'Unknown Player';
                 const team = player.teamAbbrevs || 'N/A';
                 const goals = player.goals || 0;
