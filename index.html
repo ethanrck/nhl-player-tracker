@@ -478,7 +478,6 @@
                 const gameLog = allGameLogs[player.playerId];
                 let hitRate = 0;
                 let gamesPlayed = 0;
-                let confidenceScore = 0;
                 
                 if (gameLog && gameLog.gameLog && gameLog.gameLog.length > 0) {
                     const games = gameLog.gameLog.slice(0, 10);
@@ -505,32 +504,33 @@
                     });
                     
                     hitRate = (hits / games.length) * 100;
-                    
-                    // Confidence score: penalize small sample sizes
-                    // Formula: hitRate * (gamesPlayed / 10)
-                    // So 100% with 1 game = 10 confidence, 100% with 10 games = 100 confidence
-                    confidenceScore = hitRate * (gamesPlayed / 10);
                 }
                 
                 return {
                     player: player,
                     hasOdds: hasOdds,
                     hitRate: hitRate,
-                    gamesPlayed: gamesPlayed,
-                    confidenceScore: confidenceScore
+                    gamesPlayed: gamesPlayed
                 };
             });
             
-            // Sort: 1) Players with odds first, 2) By confidence score (hit rate weighted by games played)
+            // Sort: 1) Players with odds first, 2) By hit rate (only if 4+ games), 3) By points
             playersWithHitRates.sort((a, b) => {
                 // Players with odds come first
                 if (a.hasOdds && !b.hasOdds) return -1;
                 if (!a.hasOdds && b.hasOdds) return 1;
                 
-                // Within same group (both have odds or both don't), sort by confidence score
+                // Within same group (both have odds or both don't)
                 if (a.hasOdds && b.hasOdds) {
-                    // Sort by confidence score descending
-                    return b.confidenceScore - a.confidenceScore;
+                    // Both have at least 4 games - sort by hit rate
+                    if (a.gamesPlayed >= 4 && b.gamesPlayed >= 4) {
+                        return b.hitRate - a.hitRate;
+                    }
+                    // Only one has 4+ games - they go first
+                    if (a.gamesPlayed >= 4 && b.gamesPlayed < 4) return -1;
+                    if (a.gamesPlayed < 4 && b.gamesPlayed >= 4) return 1;
+                    // Both have less than 4 games - sort by points
+                    return (b.player.points || 0) - (a.player.points || 0);
                 }
                 
                 // For players without odds, sort by points
