@@ -533,17 +533,17 @@
                 
                 console.log('Players with hit rates calculated:', playersWithHitRates.length);
                 
-                // Sort: players with odds first, then by hit rate (3+ games), then by points
+                // Sort: players with odds first, then by hit rate (4+ games), then by points
                 playersWithHitRates.sort((a, b) => {
                     if (a.hasOdds && !b.hasOdds) return -1;
                     if (!a.hasOdds && b.hasOdds) return 1;
                     
                     if (a.hasOdds && b.hasOdds) {
-                        if (a.gamesPlayed >= 3 && b.gamesPlayed >= 3) {
+                        if (a.gamesPlayed >= 4 && b.gamesPlayed >= 4) {
                             return b.hitRate - a.hitRate;
                         }
-                        if (a.gamesPlayed >= 3 && b.gamesPlayed < 3) return -1;
-                        if (a.gamesPlayed < 3 && b.gamesPlayed >= 3) return 1;
+                        if (a.gamesPlayed >= 4 && b.gamesPlayed < 4) return -1;
+                        if (a.gamesPlayed < 4 && b.gamesPlayed >= 4) return 1;
                         return (b.player.points || 0) - (a.player.points || 0);
                     }
                     
@@ -574,7 +574,13 @@
                         const line = oddsInfo.line;
                         const price = oddsInfo.odds;
                         const formattedOdds = price > 0 ? `+${price}` : price;
-                        oddsDisplay = `<div class="odds-line">O/U ${line} ${formattedOdds}</div>`;
+                        
+                        // Special display for anytime goal scorer
+                        if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
+                            oddsDisplay = `<div class="odds-line">Anytime Goal ${formattedOdds}</div>`;
+                        } else {
+                            oddsDisplay = `<div class="odds-line">O/U ${line} ${formattedOdds}</div>`;
+                        }
                     }
                     
                     return `
@@ -725,10 +731,23 @@
             if (playerOdds && playerOdds[currentStatType]) {
                 const oddsInfo = playerOdds[currentStatType];
                 const formattedOdds = oddsInfo.odds > 0 ? `+${oddsInfo.odds}` : oddsInfo.odds;
+                
+                let oddsLabel = '';
+                let oddsValue = '';
+                
+                // Special display for anytime goal scorer
+                if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
+                    oddsLabel = 'Anytime Goal Scorer';
+                    oddsValue = formattedOdds;
+                } else {
+                    oddsLabel = 'Betting Line';
+                    oddsValue = `O/U ${oddsInfo.line} ${formattedOdds}`;
+                }
+                
                 oddsCard = `
                     <div class="summary-card">
-                        <div class="summary-label">Betting Line</div>
-                        <div class="summary-value" style="color: #e67e22; font-size: 1.5em;">O/U ${oddsInfo.line} ${formattedOdds}</div>
+                        <div class="summary-label">${oddsLabel}</div>
+                        <div class="summary-value" style="color: #e67e22; font-size: 1.5em;">${oddsValue}</div>
                     </div>
                 `;
             }
