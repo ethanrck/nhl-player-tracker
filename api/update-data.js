@@ -141,15 +141,6 @@ export default async function handler(req, res) {
               
               const propsData = await propsResponse.json();
               
-              // Log available markets to debug
-              const availableMarkets = new Set();
-              propsData.bookmakers?.forEach(bookmaker => {
-                bookmaker.markets?.forEach(market => {
-                  availableMarkets.add(market.key);
-                });
-              });
-              console.log(`Available markets for this game:`, Array.from(availableMarkets).join(', '));
-              
               // Process player props from bookmakers
               // Only take the first bookmaker's odds for consistency
               const bookmaker = propsData.bookmakers?.[0];
@@ -190,7 +181,6 @@ export default async function handler(req, res) {
                         game: `${event.home_team} vs ${event.away_team}`,
                         gameTime: event.commence_time
                       };
-                      console.log(`✓ Stored goals line for ${playerName}: O/U ${outcome.point}`);
                     } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
                       bettingOdds[playerName].assists = {
                         line: outcome.point,
