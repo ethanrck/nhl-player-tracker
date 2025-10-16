@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     
     console.log(`Successfully loaded ${successCount} game logs, ${errorCount} errors`);
     
-    // Step 3: Save to file system (Vercel /tmp directory)
+    // Step 3: Create response data (we'll return it directly, not save to file)
     const cacheData = {
       lastUpdated: new Date().toISOString(),
       season: season,
@@ -76,17 +76,16 @@ export default async function handler(req, res) {
       }
     };
     
-    // Save to /tmp (persists for duration of function execution)
-    const cachePath = '/tmp/nhl-cache.json';
-    await fs.writeFile(cachePath, JSON.stringify(cacheData));
-    
-    console.log('Data cached successfully!');
+    console.log('Data collection completed!');
+    console.log(`Total size: ${JSON.stringify(cacheData).length / 1024 / 1024} MB`);
     
     return res.status(200).json({
       success: true,
       message: 'NHL data updated successfully',
       lastUpdated: cacheData.lastUpdated,
-      stats: cacheData.stats
+      stats: cacheData.stats,
+      // Return the actual data so we can use it
+      data: cacheData
     });
     
   } catch (error) {
