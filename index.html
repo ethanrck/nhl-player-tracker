@@ -328,7 +328,7 @@
 
     <script>
         // CHANGE THIS to your deployed Vercel URL after deployment
-        const API_BASE_URL = 'https://nhl-player-tracker.vercel.app/api/nhl';
+        const API_BASE_URL = 'https://your-app-name.vercel.app/api/nhl';
         
         let topPlayersData = [];
         let allPlayerGameLogs = {};
@@ -354,17 +354,21 @@
             container.innerHTML = '<div class="loading">Loading top players...</div>';
 
             try {
-                const season = '20252026';
-                const endpoint = `/v1/skater-stats-leaders/${season}/2?categories=points&limit=${topCount}`;
+                const season = '20242025';
+                // Use the stats/rest API which has full stats (goals, assists, points)
+                const endpoint = `/stats/rest/en/skater/summary?isAggregate=false&isGame=false&sort=[{"property":"points","direction":"DESC"}]&start=0&limit=${topCount}&cayenneExp=seasonId=${season} and gameTypeId=2`;
                 
                 const data = await fetchFromBackend(endpoint);
 
-                if (!data || !data.points || data.points.length === 0) {
+                if (!data || !data.data || data.data.length === 0) {
                     container.innerHTML = '<div class="error">Unable to load player data. Please try again.</div>';
                     return;
                 }
 
-                topPlayersData = data.points;
+                topPlayersData = data.data;
+                
+                // Debug: Log the first player to see the structure
+                console.log('Sample player data:', topPlayersData[0]);
                 
                 document.getElementById('apiStatus').innerHTML = '✅ Connected to live NHL API!';
                 document.getElementById('apiStatus').style.background = '#d4edda';
@@ -389,6 +393,12 @@
             
             for (let player of topPlayersData) {
                 try {
+                    // Make sure player has a playerId
+                    if (!player.playerId) {
+                        console.warn('Player missing playerId:', player);
+                        continue;
+                    }
+                    
                     const endpoint = `/v1/player/${player.playerId}/game-log/${season}/${gameType}`;
                     const gameLog = await fetchFromBackend(endpoint);
                     allPlayerGameLogs[player.playerId] = gameLog;
@@ -402,10 +412,8 @@
             const container = document.getElementById('playersContainer');
             
             let html = topPlayersData.map((player, index) => {
-                const firstName = player.firstName?.default || '';
-                const lastName = player.lastName?.default || '';
-                const name = `${firstName} ${lastName}`.trim() || 'Unknown Player';
-                const team = player.teamAbbrev || 'N/A';
+                const name = player.skaterFullName || 'Unknown Player';
+                const team = player.teamAbbrevs || 'N/A';
                 const goals = player.goals || 0;
                 const assists = player.assists || 0;
                 const points = player.points || 0;
@@ -496,9 +504,7 @@
             }
 
             const player = topPlayersData.find(p => p.playerId === playerId);
-            const firstName = player.firstName?.default || '';
-            const lastName = player.lastName?.default || '';
-            const name = `${firstName} ${lastName}`.trim() || 'Unknown Player';
+            const name = player.skaterFullName || 'Unknown Player';
             const statType = document.getElementById('statType').value;
             const lineValue = parseFloat(document.getElementById('lineValue').value);
 
@@ -548,7 +554,7 @@
             const modalContent = document.getElementById('modalContent');
             modalContent.innerHTML = `
                 <h2>${name}</h2>
-                <p>${player.teamAbbrev} - ${player.positionCode}</p>
+                <p>${player.teamAbbrevs} - ${player.positionCode}</p>
                 
                 <div class="summary-stats">
                     <div class="summary-card">
@@ -565,7 +571,7 @@
                     </div>
                     <div class="summary-card">
                         <div class="summary-label">Season Points</div>
-                        <div class="summary-value">${player.points}</div>
+                        <div class="summary-value">${player.points || 0}</div>
                     </div>
                 </div>
 
