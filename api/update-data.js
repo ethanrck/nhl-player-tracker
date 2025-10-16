@@ -34,7 +34,6 @@ export default async function handler(req, res) {
         allPlayers = allPlayers.concat(players);
         start += limit;
 
-        // If we got fewer than limit, we've reached the end
         if (players.length < limit) {
           hasMore = false;
         }
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
     let successCount = 0;
     let errorCount = 0;
 
-    // Process in batches to show progress and avoid rate limiting
     const batchSize = 50;
     for (let i = 0; i < playersWithGames.length; i += batchSize) {
       const batch = playersWithGames.slice(i, i + batchSize);
@@ -85,7 +83,6 @@ export default async function handler(req, res) {
         })
       );
 
-      // Small delay between batches to be nice to the API
       if (i + batchSize < playersWithGames.length) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -102,7 +99,6 @@ export default async function handler(req, res) {
       const oddsApiKey = process.env.ODDS_API_KEY;
 
       if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
-        // First, try to get upcoming NHL events
         const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}`;
         console.log('Checking for upcoming NHL events...');
 
@@ -119,10 +115,8 @@ export default async function handler(req, res) {
           oddsError = 'No upcoming NHL games found - likely off-season or no games scheduled';
           console.log(oddsError);
         } else {
-          // Sort events by commence_time (soonest first)
           events.sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
 
-          // Fetch ALL games for today
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
 
@@ -137,7 +131,7 @@ export default async function handler(req, res) {
             try {
               const eventId = event.id;
               const gameDate = new Date(event.commence_time).toLocaleString();
-              const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`;
+              const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_goal_scorer,player_to_score,player_assists,player_shots_on_goal&oddsFormat=american`;
 
               console.log(`Fetching: ${event.home_team} vs ${event.away_team} (${gameDate})`);
 
@@ -162,58 +156,79 @@ export default async function handler(req, res) {
             const propsData = allPropsData[i];
             if (!propsData) continue;
 
-            const bookmaker = propsData.bookmakers?.[0];
-            if (!bookmaker) {
-              console.log(`No bookmakers found for ${event.home_team} vs ${event.away_team}`);
-              continue;
-            }
+            // ✅ UPDATED SECTION — loops through all bookmakers and flexible parsing
+            for (const bookmaker of propsData.bookmakers || []) {
+              console.log(`Processing odds from ${bookmaker.title}`);
 
-            console.log(`Processing odds from ${bookmaker.title}`);
+              bookmaker.markets?.forEach(market => {
+                const key = market.key.toLowerCase();
 
-            bookmaker.markets?.forEach(market => {
-              market.outcomes?.forEach(outcome => {
-                const playerName = outcome.description;
-                if (!playerName) return;
+                market.outcomes?.forEach(outcome => {
+                  const playerName = outcome.description?.trim();
+                  if (!playerName) return;
 
-                if (!bettingOdds[playerName]) bettingOdds[playerName] = {};
+                  if (!bettingOdds[playerName]) bettingOdds[playerName] = {};
 
-                if (outcome.name === 'Over' && outcome.point !== undefined) {
-                  if (market.key === 'player_points' && !bettingOdds[playerName].points) {
-                    bettingOdds[playerName].points = {
+                  const outcomeName = outcome.name?.toLowerCase();
+                  const validGoalKeys = [
+                    'player_goals',
+                    'player_goal_scorer',
+                    'player_to_score',
+                    'player_anytime_goalscorer'
+                  ];
+
+                  const addLine = (statKey, lineData) => {
+                    if (!bettingOdds[playerName][statKey]) {
+                      bettingOdds[playerName][statKey] = lineData;
+                    }
+                  };
+
+                  // Points
+                  if (key === 'player_points' && outcome.point !== undefined && outcomeName === 'over') {
+                    addLine('points', {
                       line: outcome.point,
                       odds: outcome.price,
                       bookmaker: bookmaker.title,
                       game: `${event.home_team} vs ${event.away_team}`,
                       gameTime: event.commence_time
-                    };
-                  } else if (market.key === 'player_goals' && !bettingOdds[playerName].goals) {
-                    bettingOdds[playerName].goals = {
-                      line: outcome.point,
-                      odds: outcome.price,
-                      bookmaker: bookmaker.title,
-                      game: `${event.home_team} vs ${event.away_team}`,
-                      gameTime: event.commence_time
-                    };
-                  } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
-                    bettingOdds[playerName].assists = {
-                      line: outcome.point,
-                      odds: outcome.price,
-                      bookmaker: bookmaker.title,
-                      game: `${event.home_team} vs ${event.away_team}`,
-                      gameTime: event.commence_time
-                    };
-                  } else if (market.key === 'player_shots_on_goal' && !bettingOdds[playerName].shots) {
-                    bettingOdds[playerName].shots = {
-                      line: outcome.point,
-                      odds: outcome.price,
-                      bookmaker: bookmaker.title,
-                      game: `${event.home_team} vs ${event.away_team}`,
-                      gameTime: event.commence_time
-                    };
+                    });
                   }
-                }
+
+                  // Goals – handle all naming and outcome variants
+                  else if (validGoalKeys.includes(key) && ['over', 'yes', 'to score', 'will score'].includes(outcomeName)) {
+                    addLine('goals', {
+                      line: outcome.point ?? 1,
+                      odds: outcome.price,
+                      bookmaker: bookmaker.title,
+                      game: `${event.home_team} vs ${event.away_team}`,
+                      gameTime: event.commence_time
+                    });
+                  }
+
+                  // Assists
+                  else if (key === 'player_assists' && outcome.point !== undefined && outcomeName === 'over') {
+                    addLine('assists', {
+                      line: outcome.point,
+                      odds: outcome.price,
+                      bookmaker: bookmaker.title,
+                      game: `${event.home_team} vs ${event.away_team}`,
+                      gameTime: event.commence_time
+                    });
+                  }
+
+                  // Shots
+                  else if (key === 'player_shots_on_goal' && outcome.point !== undefined && outcomeName === 'over') {
+                    addLine('shots', {
+                      line: outcome.point,
+                      odds: outcome.price,
+                      bookmaker: bookmaker.title,
+                      game: `${event.home_team} vs ${event.away_team}`,
+                      gameTime: event.commence_time
+                    });
+                  }
+                });
               });
-            });
+            }
 
             await new Promise(resolve => setTimeout(resolve, 100));
           }
