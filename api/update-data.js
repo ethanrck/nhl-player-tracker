@@ -121,25 +121,50 @@ export default async function handler(req, res) {
           events.sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
           
           // Fetch player props using the correct endpoint
-          // We need to fetch props for each event/game individually
-          console.log(`Fetching player props for ${Math.min(events.length, 10)} soonest games...`);
+          // Fetch ALL games for today
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
           
-          for (const event of events.slice(0, 10)) { // Limit to first 10 games to save API calls
+          // Filter events to only today's games
+          const todaysGames = events.filter(event => {
+            const gameDate = new Date(event.commence_time).toISOString().split('T')[0];
+            return gameDate === todayStr;
+          });
+          
+          console.log(`Fetching player props for ALL ${todaysGames.length} games today...`);
+          
+          // Fetch all games in parallel for speed
+          const gamePromises = todaysGames.map(async (event) => {
             try {
               const eventId = event.id;
               const gameDate = new Date(event.commence_time).toLocaleString();
               const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`;
               
-              console.log(`Fetching props for: ${event.home_team} vs ${event.away_team} (${gameDate})`);
+              console.log(`Fetching: ${event.home_team} vs ${event.away_team} (${gameDate})`);
               
               const propsResponse = await fetch(propsUrl);
               
               if (!propsResponse.ok) {
-                console.log(`Failed to fetch props for event ${eventId}: ${propsResponse.status}`);
-                continue;
+                console.log(`Failed for event ${eventId}: ${propsResponse.status}`);
+                return null;
               }
               
-              const propsData = await propsResponse.json();
+              return await propsResponse.json();
+            } catch (error) {
+              console.error(`Error fetching event ${event.id}:`, error.message);
+              return null;
+            }
+          });
+          
+          // Wait for all games to complete
+          const allPropsData = await Promise.all(gamePromises);
+          
+          // Process all the props data
+          for (let i = 0; i < todaysGames.length; i++) {
+            const event = todaysGames[i];
+            const propsData = allPropsData[i];
+            
+            if (!propsData) continue;
               
               // Process player props from bookmakers
               // Only take the first bookmaker's odds for consistency
@@ -240,7 +265,7 @@ export default async function handler(req, res) {
               });
               
               // Small delay to avoid rate limiting
-              await new Promise(resolve => setTimeout(resolve, 200));
+              await new Promise(resolve => setTimeout(resolve, 100));
               
             } catch (eventError) {
               console.error(`Error fetching props for event ${event.id}:`, eventError.message);
