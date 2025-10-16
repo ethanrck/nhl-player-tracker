@@ -331,7 +331,8 @@
 <body>
     <div class="container">
         <h1>🏒 PuckProphet</h1>
-
+        <p class="subtitle">NHL Player Line Tracker - 2025-2026 Season</p>
+        
         <div class="api-status" id="apiStatus">
             📄 Loading cached data...
         </div>
@@ -771,6 +772,15 @@
                         <div class="summary-value">${player.points}</div>
                     </div>
                 </div>
+                
+                ${playerOdds && playerOdds[currentStatType] ? `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                        <div style="font-size: 0.9em; color: #856404; margin-bottom: 5px; font-weight: 600;">📅 This Game</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: #1e3c72;">${playerOdds[currentStatType].game}</div>
+                        <div style="font-size: 0.85em; color: #666; margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                        <div style="font-size: 0.85em; color: #666; margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
+                    </div>
+                ` : ''}
 
                 <h3>Last ${games.length} Games</h3>
                 <table>
