@@ -78,11 +78,20 @@ export default async function handler(req, res) {
 
         const events = await eventsResponse.json();
         const today = new Date().toISOString().split('T')[0];
-        const todaysGames = events.filter(e => new Date(e.commence_time).toISOString().split('T')[0] === today);
+        
+        // Get games for today and tomorrow (to handle timezone issues and late games)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        
+        const upcomingGames = events.filter(e => {
+          const gameDate = new Date(e.commence_time).toISOString().split('T')[0];
+          return gameDate === today || gameDate === tomorrowStr;
+        });
 
-        console.log(`Fetching props for ${todaysGames.length} games today`);
+        console.log(`Fetching props for ${upcomingGames.length} upcoming games (today + tomorrow)`);
 
-        const gamePromises = todaysGames.map(async event => {
+        const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
           const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal&oddsFormat=american`;
           const propsResponse = await fetch(propsUrl);
