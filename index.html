@@ -354,7 +354,7 @@
             container.innerHTML = '<div class="loading">Loading top players...</div>';
 
             try {
-                const season = '20242025';
+                const season = '20252026';
                 const endpoint = `/v1/skater-stats-leaders/${season}/2?categories=points&limit=${topCount}`;
                 
                 const data = await fetchFromBackend(endpoint);
