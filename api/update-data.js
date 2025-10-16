@@ -165,7 +165,8 @@ export default async function handler(req, res) {
                   // Only store 'Over' outcomes (we want the over line)
                   // Only store if we don't already have a line for this stat (first game/first line wins)
                   if (outcome.name === 'Over' && outcome.point !== undefined) {
-                    if (market.key === 'player_points' && !bettingOdds[playerName].points) {
+                    // Handle both 'player_goals' and 'player_goal_scorer' market keys
+                    if ((market.key === 'player_points') && !bettingOdds[playerName].points) {
                       bettingOdds[playerName].points = {
                         line: outcome.point,
                         odds: outcome.price,
@@ -173,7 +174,7 @@ export default async function handler(req, res) {
                         game: `${event.home_team} vs ${event.away_team}`,
                         gameTime: event.commence_time
                       };
-                    } else if (market.key === 'player_goals' && !bettingOdds[playerName].goals) {
+                    } else if ((market.key === 'player_goals' || market.key === 'player_goal_scorer') && !bettingOdds[playerName].goals) {
                       bettingOdds[playerName].goals = {
                         line: outcome.point,
                         odds: outcome.price,
