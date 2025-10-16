@@ -99,13 +99,37 @@ export default async function handler(req, res) {
     try {
       const oddsApiKey = process.env.ODDS_API_KEY;
       
-      if (oddsApiKey && oddsApiKey !== 'edeecf82cc640c59eb09c04652133191') {
-        const oddsResponse = await fetch(
-          `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`
-        );
+      if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
+        // First, try to get upcoming NHL events
+        const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}`;
+        console.log('Checking for upcoming NHL events...');
         
-        if (oddsResponse.ok) {
+        const eventsResponse = await fetch(eventsUrl);
+        
+        if (!eventsResponse.ok) {
+          throw new Error(`Events API returned status ${eventsResponse.status}: ${await eventsResponse.text()}`);
+        }
+        
+        const events = await eventsResponse.json();
+        console.log(`Found ${events.length} upcoming NHL events`);
+        
+        if (events.length === 0) {
+          oddsError = 'No upcoming NHL games found - likely off-season or no games scheduled';
+          console.log(oddsError);
+        } else {
+          // Fetch odds for player props
+          const oddsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`;
+          console.log('Fetching player prop odds...');
+          
+          const oddsResponse = await fetch(oddsUrl);
+          
+          if (!oddsResponse.ok) {
+            const errorText = await oddsResponse.text();
+            throw new Error(`Odds API returned status ${oddsResponse.status}: ${errorText}`);
+          }
+          
           const oddsData = await oddsResponse.json();
+          console.log(`Received odds data for ${oddsData.length} games`);
           
           // Process odds data and match to players
           oddsData.forEach(game => {
@@ -149,9 +173,6 @@ export default async function handler(req, res) {
           });
           
           console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
-        } else {
-          oddsError = `Odds API returned status ${oddsResponse.status}`;
-          console.error(oddsError);
         }
       } else {
         oddsError = 'ODDS_API_KEY not set in environment variables';
