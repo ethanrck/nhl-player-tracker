@@ -461,9 +461,12 @@
             const topCount = parseInt(document.getElementById('topPlayers').value);
 
             // Calculate hit rates for all players WHO HAVE GAME LOGS
-            const playersWithHitRates = topPlayersData
-                .filter(player => allPlayerGameLogs[player.playerId]) // Only players with game logs
-                .map(player => {
+            const playersWithGameLogs = topPlayersData.filter(player => allPlayerGameLogs[player.playerId]);
+            
+            console.log(`Calculating hit rates for ${playersWithGameLogs.length} players with game logs`);
+            console.log(`Total players in database: ${topPlayersData.length}`);
+            
+            const playersWithHitRates = playersWithGameLogs.map(player => {
                     const gameLog = allPlayerGameLogs[player.playerId];
                     if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
                         return { player, hitRate: -1, hits: 0, total: 0 };
@@ -473,13 +476,14 @@
                     const games = gameLog.gameLog.slice(0, 10);
                     let hits = 0;
 
-                    // Debug first player's games
-                    if (player.playerId === topPlayersData[0].playerId) {
-                        console.log('First player games:', {
-                            name: player.skaterFullName,
+                    // Debug first 3 players to see data structure
+                    if (playersWithGameLogs.indexOf(player) < 3) {
+                        console.log(`Player: ${player.skaterFullName}`, {
                             totalGames: gameLog.gameLog.length,
                             last10: games.length,
-                            sampleGame: games[0]
+                            firstGame: games[0],
+                            statType: statType,
+                            lineValue: lineValue
                         });
                     }
 
@@ -526,7 +530,12 @@
             });
 
             // Debug: Log top 5 players to verify sorting
-            console.log('Top 5 by hit rate:', playersWithHitRates.slice(0, 5).map(p => ({
+            console.log('=== SORTING DEBUG ===');
+            console.log('Stat Type:', statType);
+            console.log('Line Value:', lineValue);
+            console.log('Total players with game logs:', playersWithHitRates.length);
+            console.log('Top 10 by hit rate:', playersWithHitRates.slice(0, 10).map((p, idx) => ({
+                rank: idx + 1,
                 name: p.player.skaterFullName,
                 hitRate: p.hitRate === -1 ? 'No data' : p.hitRate.toFixed(1) + '%',
                 hits: p.hits,
