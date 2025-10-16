@@ -327,7 +327,7 @@
     </div>
 
     <script>
-        // CHANGE THIS to your deployed Vercel URL after deployment
+        // Your deployed Vercel URL
         const API_BASE_URL = 'https://nhl-player-tracker.vercel.app/api/nhl';
         
         let topPlayersData = [];
@@ -355,10 +355,14 @@
 
             try {
                 const season = '20242025';
-                // Use the stats/rest API which has full stats (goals, assists, points)
-                const endpoint = `/stats/rest/en/skater/summary?isAggregate=false&isGame=false&sort=[{"property":"points","direction":"DESC"}]&start=0&limit=${topCount}&cayenneExp=seasonId=${season} and gameTypeId=2`;
+                // Use simpler endpoint - get standings and extract players
+                const endpoint = `/v1/standings/now`;
                 
-                const data = await fetchFromBackend(endpoint);
+                const standings = await fetchFromBackend(endpoint);
+                
+                // Now get player stats from a working endpoint
+                const statsEndpoint = `/stats/rest/en/skater/summary?limit=${topCount}&start=0&sort=points&cayenneExp=seasonId=${season}`;
+                const data = await fetchFromBackend(statsEndpoint);
 
                 if (!data || !data.data || data.data.length === 0) {
                     container.innerHTML = '<div class="error">Unable to load player data. Please try again.</div>';
