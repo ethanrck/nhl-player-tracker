@@ -80,19 +80,21 @@ export default async function handler(req, res) {
         const today = new Date().toISOString().split('T')[0];
         const todaysGames = events.filter(e => new Date(e.commence_time).toISOString().split('T')[0] === today);
 
+        console.log(`Fetching props for ${todaysGames.length} games today`);
+
         const gamePromises = todaysGames.map(async event => {
           const eventId = event.id;
           const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal&oddsFormat=american`;
           const propsResponse = await fetch(propsUrl);
           if (!propsResponse.ok) return null;
-          return await propsResponse.json();
+          return { event, data: await propsResponse.json() };
         });
 
         const allPropsData = await Promise.all(gamePromises);
-        for (let i = 0; i < todaysGames.length; i++) {
-          const event = todaysGames[i];
-          const propsData = allPropsData[i];
-          if (!propsData) continue;
+        
+        for (const result of allPropsData) {
+          if (!result) continue;
+          const { event, data: propsData } = result;
 
           const bookmaker = propsData.bookmakers?.[0];
           if (!bookmaker) continue;
@@ -129,25 +131,30 @@ export default async function handler(req, res) {
                     gameTime: event.commence_time
                   };
                 }
-              } else if (market.key === 'player_goal_scorer_anytime') {
-                if (!bettingOdds[playerName].anytimeGoal) bettingOdds[playerName].anytimeGoal = [];
-                bettingOdds[playerName].anytimeGoal.push({
-                  outcome: outcome.name, // Yes or No
-                  odds: outcome.price,
-                  bookmaker: bookmaker.title,
-                  game: `${event.home_team} vs ${event.away_team}`,
-                  gameTime: event.commence_time
-                });
+              } else if (market.key === 'player_goal_scorer_anytime' && outcome.name === 'Yes') {
+                // Store anytime goal scorer as goals with 0.5 line
+                if (!bettingOdds[playerName].goals) {
+                  bettingOdds[playerName].goals = {
+                    line: 0.5,
+                    odds: outcome.price,
+                    bookmaker: bookmaker.title,
+                    game: `${event.home_team} vs ${event.away_team}`,
+                    gameTime: event.commence_time,
+                    type: 'anytime_scorer'
+                  };
+                }
               }
             });
           });
-          await new Promise(r => setTimeout(r, 100));
         }
+
+        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
       } else {
         oddsError = 'ODDS_API_KEY not set';
       }
     } catch (error) {
       oddsError = error.message;
+      console.error('Odds error:', error);
     }
 
     // Step 4: Save to Vercel Blob
@@ -179,6 +186,7 @@ export default async function handler(req, res) {
       blobUrl: blob.url
     });
   } catch (error) {
+    console.error('Update error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
