@@ -633,6 +633,40 @@
                     `;
                 }
             });
+            
+            // Update the betting odds badges when stat type changes
+            updateOddsBadges();
+        }
+        
+        function updateOddsBadges() {
+            const statType = document.getElementById('statType').value;
+            
+            filteredPlayers.forEach(player => {
+                const name = player.skaterFullName || 'Unknown Player';
+                const playerOdds = bettingOdds[name];
+                const card = document.querySelector(`[onclick="showGameLog(${player.playerId})"] .player-header`);
+                
+                if (!card) return;
+                
+                // Remove existing odds badge
+                const existingBadge = card.querySelector('.odds-line');
+                if (existingBadge) {
+                    existingBadge.remove();
+                }
+                
+                // Add new odds badge for current stat type
+                if (playerOdds && playerOdds[statType]) {
+                    const oddsInfo = playerOdds[statType];
+                    const line = oddsInfo.line;
+                    const price = oddsInfo.odds;
+                    const formattedOdds = price > 0 ? `+${price}` : price;
+                    
+                    const badge = document.createElement('div');
+                    badge.className = 'odds-line';
+                    badge.textContent = `O/U ${line} ${formattedOdds}`;
+                    card.appendChild(badge);
+                }
+            });
         }
 
         function showGameLog(playerId) {
