@@ -302,16 +302,8 @@
                 <input type="number" id="lineValue" value="0.5" step="0.5" min="0" style="width: 100px;" onchange="updateAllHitRates()">
             </div>
             
-            <div class="control-group">
-                <label>Show Top:</label>
-                <select id="topPlayers" onchange="loadTopPlayers()">
-                    <option value="10">10 Players</option>
-                    <option value="25" selected>25 Players</option>
-                    <option value="50">50 Players</option>
-                </select>
-            </div>
-            
             <button onclick="updateAllHitRates()">Recalculate All</button>
+            <button onclick="loadTopPlayers()" style="background: #e74c3c;">Force Reload Data</button>
         </div>
         
         <div id="playersContainer" class="players-grid">
@@ -543,45 +535,52 @@
                 seasonPoints: p.player.points
             })));
 
-            // Only show the top X players based on dropdown
-            const playersToShow = playersWithHitRates.slice(0, topCount);
-
-            // Update the display with sorted players and their hit rates
+            // Show ALL players sorted by hit rate
             const container = document.getElementById('playersContainer');
-            let html = playersToShow.map(({ player, hitRate, hits, total }, index) => {
+            
+            // Create header
+            let html = `
+                <div class="player-row header">
+                    <div>Rank</div>
+                    <div>Player</div>
+                    <div>Team</div>
+                    <div>Season G</div>
+                    <div>Season A</div>
+                    <div>Season P</div>
+                    <div>Hit Rate</div>
+                    <div>Action</div>
+                </div>
+            `;
+            
+            // Add all players
+            html += playersWithHitRates.map(({ player, hitRate, hits, total }, index) => {
                 const name = player.skaterFullName || 'Unknown Player';
                 const team = player.teamAbbrevs || 'N/A';
+                const position = player.positionCode || 'N/A';
                 const goals = player.goals || 0;
                 const assists = player.assists || 0;
                 const points = player.points || 0;
-                const position = player.positionCode || 'N/A';
                 
-                const hitRateDisplay = hitRate >= 0 ? 
-                    `<div class="stat-label">Last 10 Games Hit Rate</div>
-                     <div class="hit-rate-value" style="color: ${hitRate >= 80 ? '#27ae60' : hitRate >= 50 ? '#f39c12' : '#e74c3c'}">${hitRate.toFixed(1)}% (${hits}/${total})</div>` :
-                    `<div class="stat-label">No game log</div>`;
+                const hitRateColor = hitRate >= 80 ? 'hit-rate-high' : hitRate >= 50 ? 'hit-rate-medium' : 'hit-rate-low';
+                const hitRateDisplay = hitRate >= 0 ? `${hitRate.toFixed(1)}%` : 'No data';
+                const hitCount = hitRate >= 0 ? `(${hits}/${total})` : '';
                 
                 return `
-                    <div class="player-card" onclick="showGameLog(${player.playerId})">
-                        <div class="player-name">#${index + 1} ${name}</div>
-                        <div class="player-team">${team} - ${position}</div>
-                        <div class="player-stats">
-                            <div class="stat">
-                                <div class="stat-label">Goals</div>
-                                <div class="stat-value">${goals}</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-label">Assists</div>
-                                <div class="stat-value">${assists}</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-label">Points</div>
-                                <div class="stat-value">${points}</div>
-                            </div>
+                    <div class="player-row" onclick="showGameLog(${player.playerId})">
+                        <div class="rank">#${index + 1}</div>
+                        <div>
+                            <div class="player-name">${name}</div>
+                            <div class="player-team">${team} - ${position}</div>
                         </div>
-                        <div class="hit-rate-display">
-                            ${hitRateDisplay}
+                        <div class="stat-value">${team}</div>
+                        <div class="stat-value">${goals}</div>
+                        <div class="stat-value">${assists}</div>
+                        <div class="stat-value">${points}</div>
+                        <div class="hit-rate-cell">
+                            <div class="hit-rate-value ${hitRateColor}">${hitRateDisplay}</div>
+                            <div style="font-size: 0.9em; color: #666;">${hitCount}</div>
                         </div>
+                        <div style="text-align: center; color: #2a5298; font-weight: 600;">View Games →</div>
                     </div>
                 `;
             }).join('');
