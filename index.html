@@ -378,7 +378,9 @@
                 document.getElementById('apiStatus').style.background = '#d4edda';
                 
                 await loadAllGameLogs();
-                displayPlayers();
+                
+                // Don't call displayPlayers here - let updateAllHitRates handle it
+                updateAllHitRates();
 
             } catch (error) {
                 container.innerHTML = `
@@ -504,7 +506,7 @@
                 
                 const hitRateDisplay = hitRate >= 0 ? 
                     `<div class="stat-label">Last 10 Games Hit Rate</div>
-                     <div class="hit-rate-value">${hitRate.toFixed(1)}% (${hits}/${total})</div>` :
+                     <div class="hit-rate-value" style="color: ${hitRate >= 80 ? '#27ae60' : hitRate >= 50 ? '#f39c12' : '#e74c3c'}">${hitRate.toFixed(1)}% (${hits}/${total})</div>` :
                     `<div class="stat-label">No game log</div>`;
                 
                 return `
