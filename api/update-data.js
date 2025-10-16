@@ -99,7 +99,7 @@ export default async function handler(req, res) {
     try {
       const oddsApiKey = process.env.ODDS_API_KEY;
       
-      if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
+      if (oddsApiKey && oddsApiKey !== 'edeecf82cc640c59eb09c04652133191') {
         const oddsResponse = await fetch(
           `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`
         );
