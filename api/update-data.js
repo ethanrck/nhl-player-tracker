@@ -117,16 +117,20 @@ export default async function handler(req, res) {
           oddsError = 'No upcoming NHL games found - likely off-season or no games scheduled';
           console.log(oddsError);
         } else {
+          // Sort events by commence_time (soonest first)
+          events.sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
+          
           // Fetch player props using the correct endpoint
           // We need to fetch props for each event/game individually
-          console.log(`Fetching player props for ${events.length} games...`);
+          console.log(`Fetching player props for ${Math.min(events.length, 10)} soonest games...`);
           
           for (const event of events.slice(0, 10)) { // Limit to first 10 games to save API calls
             try {
               const eventId = event.id;
+              const gameDate = new Date(event.commence_time).toLocaleString();
               const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`;
               
-              console.log(`Fetching props for game: ${event.home_team} vs ${event.away_team}`);
+              console.log(`Fetching props for: ${event.home_team} vs ${event.away_team} (${gameDate})`);
               
               const propsResponse = await fetch(propsUrl);
               
@@ -138,42 +142,63 @@ export default async function handler(req, res) {
               const propsData = await propsResponse.json();
               
               // Process player props from bookmakers
-              propsData.bookmakers?.forEach(bookmaker => {
-                bookmaker.markets?.forEach(market => {
-                  market.outcomes?.forEach(outcome => {
-                    const playerName = outcome.description;
-                    
-                    if (!playerName) return;
-                    
-                    if (!bettingOdds[playerName]) {
-                      bettingOdds[playerName] = {};
+              // Only take the first bookmaker's odds for consistency
+              const bookmaker = propsData.bookmakers?.[0];
+              
+              if (!bookmaker) {
+                console.log(`No bookmakers found for ${event.home_team} vs ${event.away_team}`);
+                continue;
+              }
+              
+              console.log(`Processing odds from ${bookmaker.title}`);
+              
+              bookmaker.markets?.forEach(market => {
+                market.outcomes?.forEach(outcome => {
+                  const playerName = outcome.description;
+                  
+                  if (!playerName) return;
+                  
+                  if (!bettingOdds[playerName]) {
+                    bettingOdds[playerName] = {};
+                  }
+                  
+                  // Only store 'Over' outcomes (we want the over line)
+                  // Only store if we don't already have a line for this stat (first game/first line wins)
+                  if (outcome.name === 'Over' && outcome.point !== undefined) {
+                    if (market.key === 'player_points' && !bettingOdds[playerName].points) {
+                      bettingOdds[playerName].points = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    } else if (market.key === 'player_goals' && !bettingOdds[playerName].goals) {
+                      bettingOdds[playerName].goals = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
+                      bettingOdds[playerName].assists = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    } else if (market.key === 'player_shots_on_goal' && !bettingOdds[playerName].shots) {
+                      bettingOdds[playerName].shots = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
                     }
-                    
-                    // Only store 'Over' outcomes (we want the over line)
-                    if (outcome.name === 'Over' && outcome.point !== undefined) {
-                      if (market.key === 'player_points') {
-                        bettingOdds[playerName].points = {
-                          line: outcome.point,
-                          odds: outcome.price
-                        };
-                      } else if (market.key === 'player_goals') {
-                        bettingOdds[playerName].goals = {
-                          line: outcome.point,
-                          odds: outcome.price
-                        };
-                      } else if (market.key === 'player_assists') {
-                        bettingOdds[playerName].assists = {
-                          line: outcome.point,
-                          odds: outcome.price
-                        };
-                      } else if (market.key === 'player_shots_on_goal') {
-                        bettingOdds[playerName].shots = {
-                          line: outcome.point,
-                          odds: outcome.price
-                        };
-                      }
-                    }
-                  });
+                  }
                 });
               });
               
