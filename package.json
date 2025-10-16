@@ -4,7 +4,7 @@
   "description": "Backend API for NHL Player Line Tracker",
   "type": "module",
   "dependencies": {
-    "@vercel/blob": "^0.23.0"
+    "@vercel/blob": "^0.23.4"
   },
   "scripts": {
     "dev": "vercel dev"
