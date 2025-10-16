@@ -1,5 +1,5 @@
 // api/update-data.js - Cron job to fetch and cache NHL data + betting odds daily
-import fs from 'fs/promises';
+import { put } from '@vercel/blob';
 
 export default async function handler(req, res) {
   // Verify this is from Vercel Cron (security)
@@ -183,7 +183,7 @@ export default async function handler(req, res) {
       console.error('Error fetching odds:', error);
     }
     
-    // Step 4: Save everything to /tmp/nhl-cache.json
+    // Step 4: Save everything to Vercel Blob storage (persists permanently!)
     const cacheData = {
       lastUpdated: new Date().toISOString(),
       season: season,
@@ -199,17 +199,22 @@ export default async function handler(req, res) {
       }
     };
     
-    // Save to /tmp (persists for duration of function execution)
-    const cachePath = '/tmp/nhl-cache.json';
-    await fs.writeFile(cachePath, JSON.stringify(cacheData));
+    console.log('Saving to Vercel Blob storage...');
     
-    console.log('Data cached successfully!');
+    // Save to Vercel Blob (persists across all function instances and time!)
+    const blob = await put('nhl-cache.json', JSON.stringify(cacheData), {
+      access: 'public',
+      addRandomSuffix: false,
+    });
+    
+    console.log('Data cached successfully to Blob:', blob.url);
     
     return res.status(200).json({
       success: true,
       message: 'NHL data updated successfully',
       lastUpdated: cacheData.lastUpdated,
-      stats: cacheData.stats
+      stats: cacheData.stats,
+      blobUrl: blob.url
     });
     
   } catch (error) {
