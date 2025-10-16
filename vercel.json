@@ -2,13 +2,13 @@
   "version": 2,
   "functions": {
     "api/**/*.js": {
-      "maxDuration": 300
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/update-data",
-      "schedule": "0 10 * * *"
+      "schedule": "0 15 * * *"
     }
   ]
 }
