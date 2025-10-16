@@ -1,5 +1,5 @@
 // api/get-data.js - Serve cached NHL data from Vercel Blob
-import fs from 'fs/promises';
+import { list } from '@vercel/blob';
 
 // In-memory cache (persists across requests in same instance)
 let memoryCache = null;
@@ -27,13 +27,27 @@ export default async function handler(req, res) {
       return res.status(200).json(memoryCache);
     }
     
-    // Try to load from file system
+    // Try to load from Vercel Blob
     try {
-      const cachePath = '/tmp/nhl-cache.json';
-      const cacheContent = await fs.readFile(cachePath, 'utf-8');
-      const cacheData = JSON.parse(cacheContent);
+      console.log('Checking Vercel Blob for cache...');
       
-      console.log('Loaded from file cache, last updated:', cacheData.lastUpdated);
+      // List blobs to find our cache file
+      const { blobs } = await list({ prefix: 'nhl-cache.json' });
+      
+      if (blobs.length === 0) {
+        throw new Error('No cache found in Blob storage');
+      }
+      
+      const blobUrl = blobs[0].url;
+      console.log('Found cache in Blob, fetching:', blobUrl);
+      
+      // Fetch the blob content
+      const blobResponse = await fetch(blobUrl);
+      const cacheData = await blobResponse.json();
+      
+      console.log('Loaded from Blob cache, last updated:', cacheData.lastUpdated);
+      console.log('Players in cache:', cacheData.stats.totalPlayers);
+      console.log('Betting lines in cache:', cacheData.stats.bettingLinesLoaded);
       
       // Store in memory for faster subsequent requests
       memoryCache = cacheData;
@@ -41,59 +55,16 @@ export default async function handler(req, res) {
       
       return res.status(200).json(cacheData);
       
-    } catch (fileError) {
-      // Cache doesn't exist yet - fetch fresh data without odds
-      console.log('No cache found, fetching fresh player list...');
+    } catch (blobError) {
+      // Cache doesn't exist yet - return error message
+      console.log('No cache found in Blob storage');
+      console.error('Blob error:', blobError.message);
       
-      const season = '20252026'; // 2025-26 NHL Season
-      
-      // Fetch ALL player stats (paginated)
-      let allPlayers = [];
-      let start = 0;
-      const limit = 100;
-      let hasMore = true;
-      
-      while (hasMore) {
-        const statsUrl = `https://api.nhle.com/stats/rest/en/skater/summary?limit=${limit}&start=${start}&cayenneExp=seasonId=${season}`;
-        const statsResponse = await fetch(statsUrl);
-        const statsData = await statsResponse.json();
-        
-        const players = statsData.data || [];
-        
-        if (players.length === 0) {
-          hasMore = false;
-        } else {
-          allPlayers = allPlayers.concat(players);
-          start += limit;
-          
-          if (players.length < limit) {
-            hasMore = false;
-          }
-        }
-      }
-      
-      const playersWithGames = allPlayers.filter(p => (p.gamesPlayed || 0) > 0);
-      
-      // Return just the players without game logs or odds
-      const freshData = {
-        lastUpdated: new Date().toISOString(),
-        season: season,
-        allPlayers: playersWithGames,
-        gameLogs: {},
-        bettingOdds: {},
-        stats: {
-          totalPlayers: playersWithGames.length,
-          gameLogsLoaded: 0,
-          bettingLinesLoaded: 0,
-          note: 'Run /api/update-data to fetch game logs and betting odds'
-        }
-      };
-      
-      // Cache it
-      memoryCache = freshData;
-      cacheTimestamp = now;
-      
-      return res.status(200).json(freshData);
+      return res.status(503).json({
+        error: 'No cached data available',
+        message: 'Please run /api/update-data to populate the cache',
+        details: blobError.message
+      });
     }
     
   } catch (error) {
