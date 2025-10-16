@@ -126,6 +126,10 @@
             border-color: #2a5298;
         }
         
+        .player-card.no-odds {
+            opacity: 0.6;
+        }
+        
         .player-header {
             display: flex;
             justify-content: space-between;
@@ -332,29 +336,13 @@
             
             <div class="control-group">
                 <label>Stat Type:</label>
-                <select id="statType" onchange="updateAllHitRates()">
+                <select id="statType" onchange="onStatTypeChange()">
                     <option value="points">Points</option>
                     <option value="goals">Goals</option>
                     <option value="assists">Assists</option>
                     <option value="shots">Shots</option>
                 </select>
             </div>
-            
-            <div class="control-group">
-                <label>Line:</label>
-                <input type="number" id="lineValue" value="0.5" step="0.5" min="0" style="width: 100px;" onchange="updateAllHitRates()">
-            </div>
-            
-            <div class="control-group">
-                <label>Sort By:</label>
-                <select id="sortBy" onchange="displayPlayers()">
-                    <option value="points">Points</option>
-                    <option value="hitRate">Hit Rate</option>
-                    <option value="name">Name</option>
-                </select>
-            </div>
-            
-            <button onclick="refreshData()">🔄 Refresh All Data</button>
         </div>
         
         <div id="playersContainer" class="players-grid">
@@ -397,6 +385,7 @@
                 const data = await response.json();
                 
                 console.log('Cached data loaded:', data);
+                console.log('Betting odds sample:', Object.keys(data.bettingOdds || {}).slice(0, 5));
                 
                 allPlayersData = data.allPlayers || [];
                 allGameLogs = data.gameLogs || {};
@@ -404,9 +393,6 @@
                 
                 // Filter to only players with games played
                 allPlayersData = allPlayersData.filter(p => (p.gamesPlayed || 0) > 0);
-                
-                // Sort by points initially
-                allPlayersData.sort((a, b) => (b.points || 0) - (a.points || 0));
                 
                 filteredPlayers = [...allPlayersData];
                 
@@ -437,42 +423,6 @@
             }
         }
 
-        async function refreshData() {
-            if (!confirm('Refresh will fetch fresh data from NHL API and betting odds. This may take 1-2 minutes. Continue?')) {
-                return;
-            }
-            
-            const statusDiv = document.getElementById('apiStatus');
-            statusDiv.innerHTML = '🔄 Refreshing all data (players, game logs, betting odds)...';
-            statusDiv.style.background = '#fff3cd';
-            statusDiv.style.color = '#856404';
-            
-            try {
-                const secret = prompt('Enter CRON_SECRET (set in Vercel env vars):');
-                if (!secret) return;
-                
-                const response = await fetch(`${API_BASE_URL}/api/update-data`, {
-                    headers: {
-                        'Authorization': `Bearer ${secret}`
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to refresh data');
-                }
-                
-                const result = await response.json();
-                alert(`Data refreshed successfully!\nPlayers: ${result.stats.totalPlayers}\nGame Logs: ${result.stats.gameLogsLoaded}\nBetting Lines: ${result.stats.bettingLinesLoaded}\n\nReloading page...`);
-                location.reload();
-                
-            } catch (error) {
-                alert('Error refreshing data: ' + error.message);
-                statusDiv.innerHTML = '❌ Error refreshing data';
-                statusDiv.style.background = '#f8d7da';
-                statusDiv.style.color = '#721c24';
-            }
-        }
-
         function filterPlayers() {
             const searchTerm = document.getElementById('searchPlayer').value.toLowerCase();
             
@@ -492,36 +442,42 @@
             displayPlayers();
         }
 
+        function onStatTypeChange() {
+            // Redisplay players with new stat type (will re-sort and update odds badges)
+            displayPlayers();
+        }
+
         function getHitRateColor(hitRate) {
             if (hitRate >= 70) return 'hit-rate-excellent';
             if (hitRate >= 50) return 'hit-rate-good';
             if (hitRate >= 30) return 'hit-rate-medium';
             return 'hit-rate-poor';
         }
+        
+        function playerHasOdds(player, statType) {
+            const name = player.skaterFullName || 'Unknown Player';
+            const playerOdds = bettingOdds[name];
+            return playerOdds && playerOdds[statType];
+        }
 
         function displayPlayers() {
             const container = document.getElementById('playersContainer');
-            const sortBy = document.getElementById('sortBy').value;
             const statType = document.getElementById('statType').value;
             
-            // Sort based on selection
+            // Sort: players with odds for current stat type first, then by points
             let playersToDisplay = [...filteredPlayers];
             
-            if (sortBy === 'hitRate') {
-                playersToDisplay.sort((a, b) => {
-                    const rateA = playerHitRates[a.playerId] || 0;
-                    const rateB = playerHitRates[b.playerId] || 0;
-                    return rateB - rateA;
-                });
-            } else if (sortBy === 'name') {
-                playersToDisplay.sort((a, b) => {
-                    const nameA = a.skaterFullName || '';
-                    const nameB = b.skaterFullName || '';
-                    return nameA.localeCompare(nameB);
-                });
-            } else {
-                playersToDisplay.sort((a, b) => (b.points || 0) - (a.points || 0));
-            }
+            playersToDisplay.sort((a, b) => {
+                const aHasOdds = playerHasOdds(a, statType);
+                const bHasOdds = playerHasOdds(b, statType);
+                
+                // Players with odds come first
+                if (aHasOdds && !bHasOdds) return -1;
+                if (!aHasOdds && bHasOdds) return 1;
+                
+                // If both have odds or both don't, sort by points
+                return (b.points || 0) - (a.points || 0);
+            });
             
             if (playersToDisplay.length === 0) {
                 container.innerHTML = '<div class="loading">No players found matching your search.</div>';
@@ -540,18 +496,20 @@
                 // Get betting line for current stat type
                 const playerOdds = bettingOdds[name];
                 let oddsDisplay = '';
-                if (playerOdds && playerOdds[statType]) {
+                const hasOdds = playerOdds && playerOdds[statType];
+                
+                if (hasOdds) {
                     const oddsInfo = playerOdds[statType];
                     const line = oddsInfo.line;
                     const price = oddsInfo.odds;
-                    
-                    // Format the odds with + or - sign
                     const formattedOdds = price > 0 ? `+${price}` : price;
                     oddsDisplay = `<div class="odds-line">O/U ${line} ${formattedOdds}</div>`;
                 }
                 
+                const cardClass = hasOdds ? 'player-card' : 'player-card no-odds';
+                
                 return `
-                    <div class="player-card" onclick="showGameLog(${player.playerId})">
+                    <div class="${cardClass}" onclick="showGameLog(${player.playerId})">
                         <div class="player-header">
                             <div class="player-name">${name}</div>
                             ${oddsDisplay}
@@ -584,9 +542,18 @@
 
         function updateAllHitRates() {
             const statType = document.getElementById('statType').value;
-            const lineValue = parseFloat(document.getElementById('lineValue').value);
-
+            // Use betting line if available, otherwise use 0.5
+            
             filteredPlayers.forEach(player => {
+                const name = player.skaterFullName || 'Unknown Player';
+                const playerOdds = bettingOdds[name];
+                let lineValue = 0.5;
+                
+                // Use betting line if available for this stat
+                if (playerOdds && playerOdds[statType]) {
+                    lineValue = playerOdds[statType].line;
+                }
+                
                 const gameLog = allGameLogs[player.playerId];
                 
                 if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
@@ -628,43 +595,9 @@
                 
                 if (hitRateDiv) {
                     hitRateDiv.innerHTML = `
-                        <div class="stat-label">Last ${games.length} Games Hit Rate</div>
+                        <div class="stat-label">Last ${games.length} Games vs ${lineValue}</div>
                         <div class="hit-rate-value ${colorClass}">${hitRate}% (${hits}/${games.length})</div>
                     `;
-                }
-            });
-            
-            // Update the betting odds badges when stat type changes
-            updateOddsBadges();
-        }
-        
-        function updateOddsBadges() {
-            const statType = document.getElementById('statType').value;
-            
-            filteredPlayers.forEach(player => {
-                const name = player.skaterFullName || 'Unknown Player';
-                const playerOdds = bettingOdds[name];
-                const card = document.querySelector(`[onclick="showGameLog(${player.playerId})"] .player-header`);
-                
-                if (!card) return;
-                
-                // Remove existing odds badge
-                const existingBadge = card.querySelector('.odds-line');
-                if (existingBadge) {
-                    existingBadge.remove();
-                }
-                
-                // Add new odds badge for current stat type
-                if (playerOdds && playerOdds[statType]) {
-                    const oddsInfo = playerOdds[statType];
-                    const line = oddsInfo.line;
-                    const price = oddsInfo.odds;
-                    const formattedOdds = price > 0 ? `+${price}` : price;
-                    
-                    const badge = document.createElement('div');
-                    badge.className = 'odds-line';
-                    badge.textContent = `O/U ${line} ${formattedOdds}`;
-                    card.appendChild(badge);
                 }
             });
         }
@@ -680,7 +613,13 @@
             const player = allPlayersData.find(p => p.playerId === playerId);
             const name = player.skaterFullName || 'Unknown Player';
             const statType = document.getElementById('statType').value;
-            const lineValue = parseFloat(document.getElementById('lineValue').value);
+            
+            // Use betting line if available
+            const playerOdds = bettingOdds[name];
+            let lineValue = 0.5;
+            if (playerOdds && playerOdds[statType]) {
+                lineValue = playerOdds[statType].line;
+            }
 
             const games = gameLog.gameLog.slice(0, 10);
             let hits = 0;
@@ -727,7 +666,6 @@
             const colorClass = getHitRateColor(parseFloat(hitRate));
             
             // Get betting odds for this player and stat type
-            const playerOdds = bettingOdds[name];
             let oddsCard = '';
             if (playerOdds && playerOdds[statType]) {
                 const oddsInfo = playerOdds[statType];
