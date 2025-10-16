@@ -285,10 +285,10 @@
 <body>
     <div class="container">
         <h1>🏒 NHL Player Line Tracker</h1>
-        <p class="subtitle">2024-2025 Season - All Active Players</p>
+        <p class="subtitle">2025-2026 Season - All Active Players</p>
         
         <div class="api-status" id="apiStatus">
-            📄 Change the API_BASE_URL to your deployed Vercel URL
+            📄 Loading cached data...
         </div>
         
         <div class="controls">
@@ -337,8 +337,8 @@
     </div>
 
     <script>
-        // CHANGE THIS to your deployed Vercel URL after deployment
-        const API_BASE_URL = 'https://YOUR-APP.vercel.app';
+        // Your deployed Vercel URL
+        const API_BASE_URL = 'https://nhl-player-tracker.vercel.app';
         
         let allPlayersData = [];
         let allGameLogs = {};
@@ -389,7 +389,7 @@
                         <p style="margin-top: 10px;">Make sure you've:</p>
                         <ul style="margin-left: 20px; margin-top: 10px;">
                             <li>Deployed the backend to Vercel</li>
-                            <li>Updated the API_BASE_URL in the code</li>
+                            <li>Set CRON_SECRET environment variable</li>
                             <li>Run the /api/update-data endpoint to populate the cache</li>
                         </ul>
                     </div>
@@ -409,10 +409,12 @@
             statusDiv.style.color = '#856404';
             
             try {
-                // You'll need to set up a CRON_SECRET environment variable in Vercel
+                const secret = prompt('Enter CRON_SECRET (set in Vercel env vars):');
+                if (!secret) return;
+                
                 const response = await fetch(`${API_BASE_URL}/api/update-data`, {
                     headers: {
-                        'Authorization': `Bearer ${prompt('Enter CRON_SECRET (set in Vercel env vars):')}`
+                        'Authorization': `Bearer ${secret}`
                     }
                 });
                 
