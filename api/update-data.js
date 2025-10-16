@@ -1,5 +1,5 @@
-// api/update-data.js - Cron job to fetch and cache NHL data daily
-import { put } from '@vercel/blob';
+// api/update-data.js - Cron job to fetch and cache NHL data + betting odds daily
+import fs from 'fs/promises';
 
 export default async function handler(req, res) {
   // Verify this is from Vercel Cron (security)
@@ -91,35 +91,104 @@ export default async function handler(req, res) {
     
     console.log(`Successfully loaded ${successCount} game logs, ${errorCount} errors/empty`);
     
-    // Step 3: Save to Vercel Blob storage (persists across functions!)
+    // Step 3: Fetch betting odds from The Odds API
+    console.log('Fetching betting odds from The Odds API...');
+    let bettingOdds = {};
+    let oddsError = null;
+    
+    try {
+      const oddsApiKey = process.env.ODDS_API_KEY;
+      
+      if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
+        const oddsResponse = await fetch(
+          `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds/?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goals,player_assists,player_shots_on_goal&oddsFormat=american`
+        );
+        
+        if (oddsResponse.ok) {
+          const oddsData = await oddsResponse.json();
+          
+          // Process odds data and match to players
+          oddsData.forEach(game => {
+            game.bookmakers?.forEach(bookmaker => {
+              bookmaker.markets?.forEach(market => {
+                market.outcomes?.forEach(outcome => {
+                  const playerName = outcome.description || outcome.name;
+                  
+                  if (!bettingOdds[playerName]) {
+                    bettingOdds[playerName] = {};
+                  }
+                  
+                  // Map market types - store both line (point) and odds (price)
+                  // Only store 'Over' outcomes (we want the over line)
+                  if (outcome.name === 'Over') {
+                    if (market.key === 'player_points' && outcome.point !== undefined) {
+                      bettingOdds[playerName].points = {
+                        line: outcome.point,
+                        odds: outcome.price
+                      };
+                    } else if (market.key === 'player_goals' && outcome.point !== undefined) {
+                      bettingOdds[playerName].goals = {
+                        line: outcome.point,
+                        odds: outcome.price
+                      };
+                    } else if (market.key === 'player_assists' && outcome.point !== undefined) {
+                      bettingOdds[playerName].assists = {
+                        line: outcome.point,
+                        odds: outcome.price
+                      };
+                    } else if (market.key === 'player_shots_on_goal' && outcome.point !== undefined) {
+                      bettingOdds[playerName].shots = {
+                        line: outcome.point,
+                        odds: outcome.price
+                      };
+                    }
+                  }
+                });
+              });
+            });
+          });
+          
+          console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
+        } else {
+          oddsError = `Odds API returned status ${oddsResponse.status}`;
+          console.error(oddsError);
+        }
+      } else {
+        oddsError = 'ODDS_API_KEY not set in environment variables';
+        console.log(oddsError);
+      }
+    } catch (error) {
+      oddsError = error.message;
+      console.error('Error fetching odds:', error);
+    }
+    
+    // Step 4: Save everything to /tmp/nhl-cache.json
     const cacheData = {
       lastUpdated: new Date().toISOString(),
       season: season,
       allPlayers: playersWithGames,
       gameLogs: gameLogsData,
+      bettingOdds: bettingOdds,
       stats: {
         totalPlayers: playersWithGames.length,
         gameLogsLoaded: successCount,
-        errors: errorCount
+        errors: errorCount,
+        bettingLinesLoaded: Object.keys(bettingOdds).length,
+        oddsError: oddsError
       }
     };
     
-    console.log('Saving to Vercel Blob storage...');
+    // Save to /tmp (persists for duration of function execution)
+    const cachePath = '/tmp/nhl-cache.json';
+    await fs.writeFile(cachePath, JSON.stringify(cacheData));
     
-    // Save to Vercel Blob
-    const blob = await put('nhl-cache.json', JSON.stringify(cacheData), {
-      access: 'public',
-      addRandomSuffix: false,
-    });
-    
-    console.log('Data cached successfully to Blob:', blob.url);
+    console.log('Data cached successfully!');
     
     return res.status(200).json({
       success: true,
       message: 'NHL data updated successfully',
       lastUpdated: cacheData.lastUpdated,
-      stats: cacheData.stats,
-      blobUrl: blob.url
+      stats: cacheData.stats
     });
     
   } catch (error) {
