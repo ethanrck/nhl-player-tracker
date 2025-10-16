@@ -1,0 +1,9 @@
+{
+  "name": "nhl-player-tracker-backend",
+  "version": "1.0.0",
+  "description": "Backend API for NHL Player Line Tracker",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
