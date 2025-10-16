@@ -718,6 +718,28 @@
                         <td>${game.points || 0}</td>
                         <td>${game.shots || 0}</td>
                         <td><strong>${statValue}</strong></td>
+                    </tr>
+                `;
+            }).join(''); game.assists || 0; break;
+                    case 'shots': statValue = game.shots || 0; break;
+                }
+
+                const hit = statValue > lineValue;
+                if (hit) hits++;
+
+                const opponent = game.opponentAbbrev || 'N/A';
+                const homeAway = game.homeRoadFlag === 'H' ? 'vs' : '@';
+                const gameDate = new Date(game.gameDate).toLocaleDateString();
+
+                return `
+                    <tr class="${hit ? 'hit' : 'miss'}">
+                        <td>${gameDate}</td>
+                        <td>${homeAway} ${opponent}</td>
+                        <td>${game.goals || 0}</td>
+                        <td>${game.assists || 0}</td>
+                        <td>${game.points || 0}</td>
+                        <td>${game.shots || 0}</td>
+                        <td><strong>${statValue}</strong></td>
                         <td>${hit ? '✔ HIT' : '✗ MISS'}</td>
                     </tr>
                 `;
@@ -792,7 +814,6 @@
                             <th>Points</th>
                             <th>Shots</th>
                             <th>${currentStatType.charAt(0).toUpperCase() + currentStatType.slice(1)}</th>
-                            <th>Result</th>
                         </tr>
                     </thead>
                     <tbody>
