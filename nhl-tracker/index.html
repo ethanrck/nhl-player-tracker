@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NHL Player Line Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #1e3c72;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .api-status {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        input[type="number"], select {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        button {
+            padding: 10px 25px;
+            background: #2a5298;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #1e3c72;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .player-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .player-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-color: #2a5298;
+        }
+        
+        .player-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+        
+        .player-team {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        .player-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .hit-rate-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .hit-rate-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #27ae60;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .game-log-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: white;
+            max-width: 1000px;
+            margin: 20px auto;
+            border-radius: 15px;
+            padding: 30px;
+            position: relative;
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .close-modal:hover {
+            color: #000;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th {
+            background: #2a5298;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .hit {
+            background-color: #d4edda !important;
+        }
+        
+        .miss {
+            background-color: #f8d7da !important;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .summary-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏒 NHL Player Line Tracker</h1>
+        <p class="subtitle">Top 25 Players by Points - Click any player to see their game log</p>
+        
+        <div class="api-status" id="apiStatus">
+            🔄 Change the API_BASE_URL in the code to your deployed backend URL
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Stat Type:</label>
+                <select id="statType" onchange="updateAllHitRates()">
+                    <option value="points">Points</option>
+                    <option value="goals">Goals</option>
+                    <option value="assists">Assists</option>
+                    <option value="shots">Shots</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Line:</label>
+                <input type="number" id="lineValue" value="0.5" step="0.5" min="0" style="width: 100px;" onchange="updateAllHitRates()">
+            </div>
+            
+            <div class="control-group">
+                <label>Show Top:</label>
+                <select id="topPlayers" onchange="loadTopPlayers()">
+                    <option value="10">10 Players</option>
+                    <option value="25" selected>25 Players</option>
+                    <option value="50">50 Players</option>
+                </select>
+            </div>
+            
+            <button onclick="updateAllHitRates()">Recalculate All</button>
+        </div>
+        
+        <div id="playersContainer" class="players-grid">
+            <div class="loading">Loading top players...</div>
+        </div>
+    </div>
+    
+    <div id="gameLogModal" class="game-log-modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // CHANGE THIS to your deployed Vercel URL after deployment
+        const API_BASE_URL = 'https://your-app-name.vercel.app/api/nhl';
+        
+        let topPlayersData = [];
+        let allPlayerGameLogs = {};
+
+        window.onload = function() {
+            loadTopPlayers();
+        };
+
+        async function fetchFromBackend(endpoint) {
+            const url = `${API_BASE_URL}?endpoint=${encodeURIComponent(endpoint)}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Backend returned status ${response.status}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function loadTopPlayers() {
+            const container = document.getElementById('playersContainer');
+            const topCount = parseInt(document.getElementById('topPlayers').value);
+            container.innerHTML = '<div class="loading">Loading top players...</div>';
+
+            try {
+                const season = '20242025';
+                const endpoint = `/v1/skater-stats-leaders/${season}/2?categories=points&limit=${topCount}`;
+                
+                const data = await fetchFromBackend(endpoint);
+
+                if (!data || !data.points || data.points.length === 0) {
+                    container.innerHTML = '<div class="error">Unable to load player data. Please try again.</div>';
+                    return;
+                }
+
+                topPlayersData = data.points;
+                
+                document.getElementById('apiStatus').innerHTML = '✅ Connected to live NHL API!';
+                document.getElementById('apiStatus').style.background = '#d4edda';
+                
+                await loadAllGameLogs();
+                displayPlayers();
+
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <strong>Error loading players:</strong> ${error.message}
+                        <p style="margin-top: 10px;">Make sure you've deployed the backend and updated the API_BASE_URL in the code.</p>
+                    </div>
+                `;
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadAllGameLogs() {
+            const season = '20242025';
+            const gameType = '2';
+            
+            for (let player of topPlayersData) {
+                try {
+                    const endpoint = `/v1/player/${player.playerId}/game-log/${season}/${gameType}`;
+                    const gameLog = await fetchFromBackend(endpoint);
+                    allPlayerGameLogs[player.playerId] = gameLog;
+                } catch (error) {
+                    console.error(`Error loading game log for player ${player.playerId}:`, error);
+                }
+            }
+        }
+
+        function displayPlayers() {
+            const container = document.getElementById('playersContainer');
+            
+            let html = topPlayersData.map((player, index) => {
+                const firstName = player.firstName?.default || '';
+                const lastName = player.lastName?.default || '';
+                const name = `${firstName} ${lastName}`.trim() || 'Unknown Player';
+                const team = player.teamAbbrev || 'N/A';
+                const goals = player.goals || 0;
+                const assists = player.assists || 0;
+                const points = player.points || 0;
+                const position = player.positionCode || 'N/A';
+                
+                return `
+                    <div class="player-card" onclick="showGameLog(${player.playerId})">
+                        <div class="player-name">#${index + 1} ${name}</div>
+                        <div class="player-team">${team} - ${position}</div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <div class="stat-label">Goals</div>
+                                <div class="stat-value">${goals}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Assists</div>
+                                <div class="stat-value">${assists}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Points</div>
+                                <div class="stat-value">${points}</div>
+                            </div>
+                        </div>
+                        <div class="hit-rate-display" id="hitrate-${player.playerId}">
+                            <div class="stat-label">Loading...</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
+            updateAllHitRates();
+        }
+
+        function updateAllHitRates() {
+            const statType = document.getElementById('statType').value;
+            const lineValue = parseFloat(document.getElementById('lineValue').value);
+
+            topPlayersData.forEach(player => {
+                const gameLog = allPlayerGameLogs[player.playerId];
+                if (!gameLog || !gameLog.gameLog) {
+                    const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                    if (hitRateDiv) {
+                        hitRateDiv.innerHTML = `<div class="stat-label">No game log</div>`;
+                    }
+                    return;
+                }
+
+                const games = gameLog.gameLog.slice(0, 10);
+                let hits = 0;
+
+                games.forEach(game => {
+                    let statValue;
+                    switch(statType) {
+                        case 'points':
+                            statValue = game.points || 0;
+                            break;
+                        case 'goals':
+                            statValue = game.goals || 0;
+                            break;
+                        case 'assists':
+                            statValue = game.assists || 0;
+                            break;
+                        case 'shots':
+                            statValue = game.shots || 0;
+                            break;
+                    }
+                    if (statValue > lineValue) hits++;
+                });
+
+                const hitRate = games.length > 0 ? ((hits / games.length) * 100).toFixed(1) : 0;
+                const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                
+                if (hitRateDiv) {
+                    hitRateDiv.innerHTML = `
+                        <div class="stat-label">Last 10 Games Hit Rate</div>
+                        <div class="hit-rate-value">${hitRate}% (${hits}/${games.length})</div>
+                    `;
+                }
+            });
+        }
+
+        function showGameLog(playerId) {
+            const gameLog = allPlayerGameLogs[playerId];
+            if (!gameLog || !gameLog.gameLog) {
+                alert('Game log not available for this player');
+                return;
+            }
+
+            const player = topPlayersData.find(p => p.playerId === playerId);
+            const firstName = player.firstName?.default || '';
+            const lastName = player.lastName?.default || '';
+            const name = `${firstName} ${lastName}`.trim() || 'Unknown Player';
+            const statType = document.getElementById('statType').value;
+            const lineValue = parseFloat(document.getElementById('lineValue').value);
+
+            const games = gameLog.gameLog.slice(0, 10);
+            let hits = 0;
+
+            const gameRows = games.map(game => {
+                let statValue;
+                switch(statType) {
+                    case 'points':
+                        statValue = game.points || 0;
+                        break;
+                    case 'goals':
+                        statValue = game.goals || 0;
+                        break;
+                    case 'assists':
+                        statValue = game.assists || 0;
+                        break;
+                    case 'shots':
+                        statValue = game.shots || 0;
+                        break;
+                }
+
+                const hit = statValue > lineValue;
+                if (hit) hits++;
+
+                const opponent = game.opponentAbbrev || 'N/A';
+                const homeAway = game.homeRoadFlag === 'H' ? 'vs' : '@';
+                const gameDate = new Date(game.gameDate).toLocaleDateString();
+
+                return `
+                    <tr class="${hit ? 'hit' : 'miss'}">
+                        <td>${gameDate}</td>
+                        <td>${homeAway} ${opponent}</td>
+                        <td>${game.goals || 0}</td>
+                        <td>${game.assists || 0}</td>
+                        <td>${game.points || 0}</td>
+                        <td>${game.shots || 0}</td>
+                        <td><strong>${statValue}</strong></td>
+                        <td>${hit ? '✓ HIT' : '✗ MISS'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const hitRate = ((hits / games.length) * 100).toFixed(1);
+
+            const modalContent = document.getElementById('modalContent');
+            modalContent.innerHTML = `
+                <h2>${name}</h2>
+                <p>${player.teamAbbrev} - ${player.positionCode}</p>
+                
+                <div class="summary-stats">
+                    <div class="summary-card">
+                        <div class="summary-label">Hit Rate</div>
+                        <div class="summary-value" style="color: #27ae60;">${hitRate}%</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Hits</div>
+                        <div class="summary-value">${hits}/${games.length}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Line</div>
+                        <div class="summary-value">${statType} > ${lineValue}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Season Points</div>
+                        <div class="summary-value">${player.points}</div>
+                    </div>
+                </div>
+
+                <h3>Last ${games.length} Games</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Opponent</th>
+                            <th>Goals</th>
+                            <th>Assists</th>
+                            <th>Points</th>
+                            <th>Shots</th>
+                            <th>${statType.charAt(0).toUpperCase() + statType.slice(1)}</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${gameRows}
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('gameLogModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('gameLogModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('gameLogModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
