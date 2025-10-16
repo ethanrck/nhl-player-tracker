@@ -354,7 +354,7 @@
             container.innerHTML = '<div class="loading">Loading top players...</div>';
 
             try {
-                const season = '20252026';
+                const season = '20252026';  // Updated to 2025-2026 season
                 // Use simpler endpoint - get standings and extract players
                 const endpoint = `/v1/standings/now`;
                 
@@ -392,7 +392,7 @@
         }
 
         async function loadAllGameLogs() {
-            const season = '20252026';
+            const season = '20252026';  // Updated to 2025-2026 season
             const gameType = '2';
             
             for (let player of topPlayersData) {
@@ -456,14 +456,11 @@
             const statType = document.getElementById('statType').value;
             const lineValue = parseFloat(document.getElementById('lineValue').value);
 
-            topPlayersData.forEach(player => {
+            // Calculate hit rates for all players
+            const playersWithHitRates = topPlayersData.map(player => {
                 const gameLog = allPlayerGameLogs[player.playerId];
                 if (!gameLog || !gameLog.gameLog) {
-                    const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
-                    if (hitRateDiv) {
-                        hitRateDiv.innerHTML = `<div class="stat-label">No game log</div>`;
-                    }
-                    return;
+                    return { player, hitRate: -1, hits: 0, total: 0 };
                 }
 
                 const games = gameLog.gameLog.slice(0, 10);
@@ -488,16 +485,54 @@
                     if (statValue > lineValue) hits++;
                 });
 
-                const hitRate = games.length > 0 ? ((hits / games.length) * 100).toFixed(1) : 0;
-                const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
-                
-                if (hitRateDiv) {
-                    hitRateDiv.innerHTML = `
-                        <div class="stat-label">Last 10 Games Hit Rate</div>
-                        <div class="hit-rate-value">${hitRate}% (${hits}/${games.length})</div>
-                    `;
-                }
+                const hitRate = games.length > 0 ? (hits / games.length) * 100 : -1;
+                return { player, hitRate, hits, total: games.length };
             });
+
+            // Sort by hit rate (highest first)
+            playersWithHitRates.sort((a, b) => b.hitRate - a.hitRate);
+
+            // Update the display with sorted players and their hit rates
+            const container = document.getElementById('playersContainer');
+            let html = playersWithHitRates.map(({ player, hitRate, hits, total }, index) => {
+                const name = player.skaterFullName || 'Unknown Player';
+                const team = player.teamAbbrevs || 'N/A';
+                const goals = player.goals || 0;
+                const assists = player.assists || 0;
+                const points = player.points || 0;
+                const position = player.positionCode || 'N/A';
+                
+                const hitRateDisplay = hitRate >= 0 ? 
+                    `<div class="stat-label">Last 10 Games Hit Rate</div>
+                     <div class="hit-rate-value">${hitRate.toFixed(1)}% (${hits}/${total})</div>` :
+                    `<div class="stat-label">No game log</div>`;
+                
+                return `
+                    <div class="player-card" onclick="showGameLog(${player.playerId})">
+                        <div class="player-name">#${index + 1} ${name}</div>
+                        <div class="player-team">${team} - ${position}</div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <div class="stat-label">Goals</div>
+                                <div class="stat-value">${goals}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Assists</div>
+                                <div class="stat-value">${assists}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Points</div>
+                                <div class="stat-value">${points}</div>
+                            </div>
+                        </div>
+                        <div class="hit-rate-display">
+                            ${hitRateDisplay}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
         }
 
         function showGameLog(playerId) {
