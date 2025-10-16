@@ -390,20 +390,13 @@
             container.innerHTML = '<div class="loading">Loading all players from cache...</div>';
 
             try {
-                console.log('Fetching from:', `${API_BASE_URL}/api/get-data`);
                 const response = await fetch(`${API_BASE_URL}/api/get-data`);
-                
-                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
                     throw new Error(`Failed to fetch cached data: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                
-                console.log('Cached data loaded:', data);
-                console.log('Players count:', data.allPlayers?.length);
-                console.log('Betting odds keys:', Object.keys(data.bettingOdds || {}).length);
                 
                 allPlayersData = data.allPlayers || [];
                 allGameLogs = data.gameLogs || {};
@@ -412,39 +405,25 @@
                 allPlayersData = allPlayersData.filter(p => (p.gamesPlayed || 0) > 0);
                 filteredPlayers = [...allPlayersData];
                 
-                console.log('Filtered to', allPlayersData.length, 'players with games');
-                
                 const statusDiv = document.getElementById('apiStatus');
                 const bettingLinesCount = data.stats?.bettingLinesLoaded || 0;
                 statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
                 statusDiv.style.background = '#d4edda';
                 statusDiv.style.color = '#155724';
                 
-                console.log('About to display players...');
                 displayPlayers();
-                console.log('Display players completed');
 
             } catch (error) {
-                console.error('Error in loadCachedData:', error);
-                container.innerHTML = `
-                    <div class="error">
-                        <strong>Error loading cached data:</strong> ${error.message}
-                        <p style="margin-top: 10px;">Check browser console for details</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="error"><strong>Error loading cached data:</strong> ${error.message}</div>`;
+                console.error('Error:', error);
             }
         }
 
         function selectStat(stat) {
             currentStatType = stat;
             
-            // Update button styles
             document.querySelectorAll('.stat-button').forEach(btn => {
                 btn.classList.remove('active');
-            });
-            
-            // Find the clicked button by matching the stat
-            document.querySelectorAll('.stat-button').forEach(btn => {
                 if (btn.textContent.toLowerCase() === stat) {
                     btn.classList.add('active');
                 }
@@ -458,11 +437,9 @@
             const hideNoLines = document.getElementById('hideNoLines').checked;
             
             filteredPlayers = allPlayersData.filter(player => {
-                // Search filter
                 const fullName = `${player.skaterFullName || ''}`.toLowerCase();
                 const matchesSearch = searchTerm === '' || fullName.includes(searchTerm);
                 
-                // Lines filter
                 const name = player.skaterFullName || 'Unknown Player';
                 const playerOdds = bettingOdds[name];
                 const hasLine = playerOdds && playerOdds[currentStatType];
@@ -480,148 +457,121 @@
             if (hitRate >= 30) return 'hit-rate-medium';
             return 'hit-rate-poor';
         }
-        
-        function playerHasOdds(player) {
-            const name = player.skaterFullName || 'Unknown Player';
-            const playerOdds = bettingOdds[name];
-            return playerOdds && playerOdds[currentStatType];
-        }
 
         function displayPlayers() {
-            console.log('displayPlayers called');
             const container = document.getElementById('playersContainer');
             
-            try {
-                console.log('Filtered players count:', filteredPlayers.length);
+            const playersWithHitRates = filteredPlayers.map(player => {
+                const name = player.skaterFullName || 'Unknown Player';
+                const playerOdds = bettingOdds[name];
+                const hasOdds = playerOdds && playerOdds[currentStatType];
                 
-                // Calculate hit rates for sorting
-                const playersWithHitRates = filteredPlayers.map(player => {
-                    const name = player.skaterFullName || 'Unknown Player';
-                    const playerOdds = bettingOdds[name];
-                    const hasOdds = playerOdds && playerOdds[currentStatType];
-                    
-                    let lineValue = 0.5;
-                    if (hasOdds) {
-                        lineValue = playerOdds[currentStatType].line;
-                    }
-                    
-                    const gameLog = allGameLogs[player.playerId];
-                    let hitRate = 0;
-                    let gamesPlayed = 0;
-                    
-                    if (gameLog && gameLog.gameLog && gameLog.gameLog.length > 0) {
-                        const games = gameLog.gameLog.slice(0, 10);
-                        gamesPlayed = games.length;
-                        let hits = 0;
-                        
-                        games.forEach(game => {
-                            let statValue;
-                            switch(currentStatType) {
-                                case 'points': statValue = game.points || 0; break;
-                                case 'goals': statValue = game.goals || 0; break;
-                                case 'assists': statValue = game.assists || 0; break;
-                                case 'shots': statValue = game.shots || 0; break;
-                            }
-                            if (statValue > lineValue) hits++;
-                        });
-                        
-                        hitRate = (hits / games.length) * 100;
-                    }
-                    
-                    return { player, hasOdds, hitRate, gamesPlayed };
-                });
-                
-                console.log('Players with hit rates calculated:', playersWithHitRates.length);
-                
-                // Sort: players with odds first, then by hit rate (4+ games), then by points
-                playersWithHitRates.sort((a, b) => {
-                    if (a.hasOdds && !b.hasOdds) return -1;
-                    if (!a.hasOdds && b.hasOdds) return 1;
-                    
-                    if (a.hasOdds && b.hasOdds) {
-                        if (a.gamesPlayed >= 4 && b.gamesPlayed >= 4) {
-                            return b.hitRate - a.hitRate;
-                        }
-                        if (a.gamesPlayed >= 4 && b.gamesPlayed < 4) return -1;
-                        if (a.gamesPlayed < 4 && b.gamesPlayed >= 4) return 1;
-                        return (b.player.points || 0) - (a.player.points || 0);
-                    }
-                    
-                    return (b.player.points || 0) - (a.player.points || 0);
-                });
-                
-                console.log('Players sorted');
-                
-                if (playersWithHitRates.length === 0) {
-                    container.innerHTML = '<div class="loading">No players found.</div>';
-                    return;
+                let lineValue = 0.5;
+                if (hasOdds) {
+                    lineValue = playerOdds[currentStatType].line;
                 }
                 
-                let html = playersWithHitRates.map(({player, hasOdds}) => {
-                    const name = player.skaterFullName || 'Unknown Player';
-                    const team = player.teamAbbrevs || 'N/A';
-                    const goals = player.goals || 0;
-                    const assists = player.assists || 0;
-                    const points = player.points || 0;
-                    const position = player.positionCode || 'N/A';
-                    const gamesPlayed = player.gamesPlayed || 0;
+                const gameLog = allGameLogs[player.playerId];
+                let hitRate = 0;
+                let gamesPlayed = 0;
+                
+                if (gameLog && gameLog.gameLog && gameLog.gameLog.length > 0) {
+                    const games = gameLog.gameLog.slice(0, 10);
+                    gamesPlayed = games.length;
+                    let hits = 0;
                     
-                    const playerOdds = bettingOdds[name];
-                    let oddsDisplay = '';
-                    
-                    if (hasOdds) {
-                        const oddsInfo = playerOdds[currentStatType];
-                        const line = oddsInfo.line;
-                        const price = oddsInfo.odds;
-                        const formattedOdds = price > 0 ? `+${price}` : price;
+                    games.forEach(game => {
+                        let statValue = 0;
+                        if (currentStatType === 'points') statValue = game.points || 0;
+                        else if (currentStatType === 'goals') statValue = game.goals || 0;
+                        else if (currentStatType === 'assists') statValue = game.assists || 0;
+                        else if (currentStatType === 'shots') statValue = game.shots || 0;
                         
-                        // Special display for anytime goal scorer
-                        if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
-                            oddsDisplay = `<div class="odds-line">Anytime Goal ${formattedOdds}</div>`;
-                        } else {
-                            oddsDisplay = `<div class="odds-line">O/U ${line} ${formattedOdds}</div>`;
-                        }
-                    }
+                        if (statValue > lineValue) hits++;
+                    });
                     
-                    return `
-                        <div class="player-card" onclick="showGameLog(${player.playerId})">
-                            <div class="player-header">
-                                <div class="player-name">${name}</div>
-                                ${oddsDisplay}
+                    hitRate = (hits / games.length) * 100;
+                }
+                
+                return { player, hasOdds, hitRate, gamesPlayed };
+            });
+            
+            playersWithHitRates.sort((a, b) => {
+                if (a.hasOdds && !b.hasOdds) return -1;
+                if (!a.hasOdds && b.hasOdds) return 1;
+                
+                if (a.hasOdds && b.hasOdds) {
+                    if (a.gamesPlayed >= 4 && b.gamesPlayed >= 4) {
+                        return b.hitRate - a.hitRate;
+                    }
+                    if (a.gamesPlayed >= 4 && b.gamesPlayed < 4) return -1;
+                    if (a.gamesPlayed < 4 && b.gamesPlayed >= 4) return 1;
+                    return (b.player.points || 0) - (a.player.points || 0);
+                }
+                
+                return (b.player.points || 0) - (a.player.points || 0);
+            });
+            
+            if (playersWithHitRates.length === 0) {
+                container.innerHTML = '<div class="loading">No players found.</div>';
+                return;
+            }
+            
+            let html = playersWithHitRates.map(({player, hasOdds}) => {
+                const name = player.skaterFullName || 'Unknown Player';
+                const team = player.teamAbbrevs || 'N/A';
+                const goals = player.goals || 0;
+                const assists = player.assists || 0;
+                const points = player.points || 0;
+                const position = player.positionCode || 'N/A';
+                const gamesPlayed = player.gamesPlayed || 0;
+                
+                const playerOdds = bettingOdds[name];
+                let oddsDisplay = '';
+                
+                if (hasOdds) {
+                    const oddsInfo = playerOdds[currentStatType];
+                    const line = oddsInfo.line;
+                    const price = oddsInfo.odds;
+                    const formattedOdds = price > 0 ? `+${price}` : price;
+                    
+                    if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
+                        oddsDisplay = `<div class="odds-line">Anytime Goal ${formattedOdds}</div>`;
+                    } else {
+                        oddsDisplay = `<div class="odds-line">O/U ${line} ${formattedOdds}</div>`;
+                    }
+                }
+                
+                return `
+                    <div class="player-card" onclick="showGameLog(${player.playerId})">
+                        <div class="player-header">
+                            <div class="player-name">${name}</div>
+                            ${oddsDisplay}
+                        </div>
+                        <div class="player-team">${team} - ${position} | GP: ${gamesPlayed}</div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <div class="stat-label">Goals</div>
+                                <div class="stat-value">${goals}</div>
                             </div>
-                            <div class="player-team">${team} - ${position} | GP: ${gamesPlayed}</div>
-                            <div class="player-stats">
-                                <div class="stat">
-                                    <div class="stat-label">Goals</div>
-                                    <div class="stat-value">${goals}</div>
-                                </div>
-                                <div class="stat">
-                                    <div class="stat-label">Assists</div>
-                                    <div class="stat-value">${assists}</div>
-                                </div>
-                                <div class="stat">
-                                    <div class="stat-label">Points</div>
-                                    <div class="stat-value">${points}</div>
-                                </div>
+                            <div class="stat">
+                                <div class="stat-label">Assists</div>
+                                <div class="stat-value">${assists}</div>
                             </div>
-                            <div class="hit-rate-display" id="hitrate-${player.playerId}">
-                                <div class="stat-label">Calculating...</div>
+                            <div class="stat">
+                                <div class="stat-label">Points</div>
+                                <div class="stat-value">${points}</div>
                             </div>
                         </div>
-                    `;
-                }).join('');
-                
-                console.log('HTML generated, length:', html.length);
-                container.innerHTML = html;
-                console.log('HTML inserted into container');
-                
-                updateAllHitRates();
-                console.log('Hit rates updated');
-                
-            } catch (error) {
-                console.error('Error in displayPlayers:', error);
-                container.innerHTML = `<div class="error">Error displaying players: ${error.message}</div>`;
-            }
+                        <div class="hit-rate-display" id="hitrate-${player.playerId}">
+                            <div class="stat-label">Calculating...</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
+            updateAllHitRates();
         }
 
         function updateAllHitRates() {
@@ -649,13 +599,12 @@
                 let hits = 0;
 
                 games.forEach(game => {
-                    let statValue;
-                    switch(currentStatType) {
-                        case 'points': statValue = game.points || 0; break;
-                        case 'goals': statValue = game.goals || 0; break;
-                        case 'assists': statValue = game.assists || 0; break;
-                        case 'shots': statValue = game.shots || 0; break;
-                    }
+                    let statValue = 0;
+                    if (currentStatType === 'points') statValue = game.points || 0;
+                    else if (currentStatType === 'goals') statValue = game.goals || 0;
+                    else if (currentStatType === 'assists') statValue = game.assists || 0;
+                    else if (currentStatType === 'shots') statValue = game.shots || 0;
+                    
                     if (statValue > lineValue) hits++;
                 });
 
@@ -695,13 +644,11 @@
             let hits = 0;
 
             const gameRows = games.map(game => {
-                let statValue;
-                switch(currentStatType) {
-                    case 'points': statValue = game.points || 0; break;
-                    case 'goals': statValue = game.goals || 0; break;
-                    case 'assists': statValue = game.assists || 0; break;
-                    case 'shots': statValue = game.shots || 0; break;
-                }
+                let statValue = 0;
+                if (currentStatType === 'points') statValue = game.points || 0;
+                else if (currentStatType === 'goals') statValue = game.goals || 0;
+                else if (currentStatType === 'assists') statValue = game.assists || 0;
+                else if (currentStatType === 'shots') statValue = game.shots || 0;
 
                 const hit = statValue > lineValue;
                 if (hit) hits++;
@@ -719,29 +666,6 @@
                         <td>${game.points || 0}</td>
                         <td>${game.shots || 0}</td>
                         <td><strong>${statValue}</strong></td>
-                    </tr>
-                `;
-            }).join(''); game.assists || 0; break;
-                    case 'shots': statValue = game.shots || 0; break;
-                }
-
-                const hit = statValue > lineValue;
-                if (hit) hits++;
-
-                const opponent = game.opponentAbbrev || 'N/A';
-                const homeAway = game.homeRoadFlag === 'H' ? 'vs' : '@';
-                const gameDate = new Date(game.gameDate).toLocaleDateString();
-
-                return `
-                    <tr class="${hit ? 'hit' : 'miss'}">
-                        <td>${gameDate}</td>
-                        <td>${homeAway} ${opponent}</td>
-                        <td>${game.goals || 0}</td>
-                        <td>${game.assists || 0}</td>
-                        <td>${game.points || 0}</td>
-                        <td>${game.shots || 0}</td>
-                        <td><strong>${statValue}</strong></td>
-                        <td>${hit ? '✔ HIT' : '✗ MISS'}</td>
                     </tr>
                 `;
             }).join('');
@@ -754,16 +678,12 @@
                 const oddsInfo = playerOdds[currentStatType];
                 const formattedOdds = oddsInfo.odds > 0 ? `+${oddsInfo.odds}` : oddsInfo.odds;
                 
-                let oddsLabel = '';
-                let oddsValue = '';
+                let oddsLabel = 'Betting Line';
+                let oddsValue = `O/U ${oddsInfo.line} ${formattedOdds}`;
                 
-                // Special display for anytime goal scorer
                 if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
                     oddsLabel = 'Anytime Goal Scorer';
                     oddsValue = formattedOdds;
-                } else {
-                    oddsLabel = 'Betting Line';
-                    oddsValue = `O/U ${oddsInfo.line} ${formattedOdds}`;
                 }
                 
                 oddsCard = `
