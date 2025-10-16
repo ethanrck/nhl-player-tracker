@@ -491,8 +491,27 @@
                 return { player, hitRate, hits, total: games.length };
             });
 
-            // Sort by hit rate (highest first)
-            playersWithHitRates.sort((a, b) => b.hitRate - a.hitRate);
+            // Sort by hit rate (highest first), then by hits, then by total games
+            playersWithHitRates.sort((a, b) => {
+                // First sort by hit rate percentage (highest first)
+                if (b.hitRate !== a.hitRate) {
+                    return b.hitRate - a.hitRate;
+                }
+                // If tied, sort by number of hits (highest first)
+                if (b.hits !== a.hits) {
+                    return b.hits - a.hits;
+                }
+                // If still tied, sort by games played (most first)
+                return b.total - a.total;
+            });
+
+            // Debug: Log top 3 players to verify sorting
+            console.log('Top 3 by hit rate:', playersWithHitRates.slice(0, 3).map(p => ({
+                name: p.player.skaterFullName,
+                hitRate: p.hitRate.toFixed(1) + '%',
+                hits: p.hits,
+                total: p.total
+            })));
 
             // Update the display with sorted players and their hit rates
             const container = document.getElementById('playersContainer');
