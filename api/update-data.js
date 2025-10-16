@@ -141,6 +141,15 @@ export default async function handler(req, res) {
               
               const propsData = await propsResponse.json();
               
+              // Log available markets to debug
+              const availableMarkets = new Set();
+              propsData.bookmakers?.forEach(bookmaker => {
+                bookmaker.markets?.forEach(market => {
+                  availableMarkets.add(market.key);
+                });
+              });
+              console.log(`Available markets for this game:`, Array.from(availableMarkets).join(', '));
+              
               // Process player props from bookmakers
               // Only take the first bookmaker's odds for consistency
               const bookmaker = propsData.bookmakers?.[0];
@@ -165,6 +174,43 @@ export default async function handler(req, res) {
                   // Only store 'Over' outcomes (we want the over line)
                   // Only store if we don't already have a line for this stat (first game/first line wins)
                   if (outcome.name === 'Over' && outcome.point !== undefined) {
+                    if (market.key === 'player_points' && !bettingOdds[playerName].points) {
+                      bettingOdds[playerName].points = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    } else if (market.key === 'player_goals' && !bettingOdds[playerName].goals) {
+                      bettingOdds[playerName].goals = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                      console.log(`✓ Stored goals line for ${playerName}: O/U ${outcome.point}`);
+                    } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
+                      bettingOdds[playerName].assists = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    } else if (market.key === 'player_shots_on_goal' && !bettingOdds[playerName].shots) {
+                      bettingOdds[playerName].shots = {
+                        line: outcome.point,
+                        odds: outcome.price,
+                        bookmaker: bookmaker.title,
+                        game: `${event.home_team} vs ${event.away_team}`,
+                        gameTime: event.commence_time
+                      };
+                    }
+                  }
+                });
+              });if (outcome.name === 'Over' && outcome.point !== undefined) {
                     // Handle both 'player_goals' and 'player_goal_scorer' market keys
                     if ((market.key === 'player_points') && !bettingOdds[playerName].points) {
                       bettingOdds[playerName].points = {
