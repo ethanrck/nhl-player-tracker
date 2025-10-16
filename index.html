@@ -41,8 +41,8 @@
         }
         
         .api-status {
-            background: #d4edda;
-            color: #155724;
+            background: #fff3cd;
+            color: #856404;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 20px;
@@ -72,7 +72,7 @@
             color: #333;
         }
         
-        input[type="number"], select {
+        input[type="number"], select, input[type="text"] {
             padding: 10px;
             font-size: 16px;
             border: 2px solid #ddd;
@@ -97,6 +97,11 @@
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+        
+        .search-box {
+            flex-grow: 1;
+            min-width: 250px;
         }
         
         .players-grid {
@@ -280,13 +285,18 @@
 <body>
     <div class="container">
         <h1>🏒 NHL Player Line Tracker</h1>
-        <p class="subtitle">Top 25 Players by Points - Click any player to see their game log</p>
+        <p class="subtitle">2024-2025 Season - All Active Players</p>
         
         <div class="api-status" id="apiStatus">
-            🔄 Change the API_BASE_URL in the code to your deployed backend URL
+            📄 Change the API_BASE_URL to your deployed Vercel URL
         </div>
         
         <div class="controls">
+            <div class="control-group search-box">
+                <label>Search Player:</label>
+                <input type="text" id="searchPlayer" placeholder="Type player name..." oninput="filterPlayers()" style="flex-grow: 1;">
+            </div>
+            
             <div class="control-group">
                 <label>Stat Type:</label>
                 <select id="statType" onchange="updateAllHitRates()">
@@ -302,12 +312,20 @@
                 <input type="number" id="lineValue" value="0.5" step="0.5" min="0" style="width: 100px;" onchange="updateAllHitRates()">
             </div>
             
-            <button onclick="updateAllHitRates()">Recalculate All</button>
-            <button onclick="loadTopPlayers()" style="background: #e74c3c;">Force Reload Data</button>
+            <div class="control-group">
+                <label>Sort By:</label>
+                <select id="sortBy" onchange="displayPlayers()">
+                    <option value="points">Points</option>
+                    <option value="hitRate">Hit Rate</option>
+                    <option value="name">Name</option>
+                </select>
+            </div>
+            
+            <button onclick="refreshData()">🔄 Refresh Data</button>
         </div>
         
         <div id="playersContainer" class="players-grid">
-            <div class="loading">Loading top players...</div>
+            <div class="loading">Loading all players from cache...</div>
         </div>
     </div>
     
@@ -319,109 +337,161 @@
     </div>
 
     <script>
-        // Your deployed Vercel URL
-        const API_BASE_URL = 'https://nhl-player-tracker.vercel.app/api/nhl';
-        const CACHED_DATA_URL = 'https://nhl-player-tracker.vercel.app/api/get-data';
+        // CHANGE THIS to your deployed Vercel URL after deployment
+        const API_BASE_URL = 'https://YOUR-APP.vercel.app';
         
-        let topPlayersData = [];
-        let allPlayerGameLogs = {};
+        let allPlayersData = [];
+        let allGameLogs = {};
+        let filteredPlayers = [];
+        let playerHitRates = {};
 
         window.onload = function() {
-            loadTopPlayers();
+            loadCachedData();
         };
 
-        async function fetchFromBackend(endpoint) {
-            const url = `${API_BASE_URL}?endpoint=${encodeURIComponent(endpoint)}`;
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Backend returned status ${response.status}`);
-            }
-            
-            return await response.json();
-        }
-
-        async function loadTopPlayers() {
+        async function loadCachedData() {
             const container = document.getElementById('playersContainer');
-            const topCount = parseInt(document.getElementById('topPlayers').value);
-            container.innerHTML = '<div class="loading">Loading top players...</div>';
+            container.innerHTML = '<div class="loading">Loading all players from cache...</div>';
 
             try {
-                const season = '20252026';  // Updated to 2025-2026 season
-                // Use simpler endpoint - get standings and extract players
-                const endpoint = `/v1/standings/now`;
+                const response = await fetch(`${API_BASE_URL}/api/get-data`);
                 
-                const standings = await fetchFromBackend(endpoint);
-                
-                // Now get player stats from a working endpoint
-                const statsEndpoint = `/stats/rest/en/skater/summary?limit=${topCount}&start=0&sort=points&cayenneExp=seasonId=${season}`;
-                const data = await fetchFromBackend(statsEndpoint);
-
-                if (!data || !data.data || data.data.length === 0) {
-                    container.innerHTML = '<div class="error">Unable to load player data. Please try again.</div>';
-                    return;
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch cached data: ${response.status}`);
                 }
-
-                topPlayersData = data.data;
                 
-                // Debug: Log the first player to see the structure
-                console.log('Sample player data:', topPlayersData[0]);
+                const data = await response.json();
                 
-                document.getElementById('apiStatus').innerHTML = '✅ Connected to live NHL API!';
-                document.getElementById('apiStatus').style.background = '#d4edda';
+                console.log('Cached data loaded:', data);
                 
-                await loadAllGameLogs();
+                allPlayersData = data.allPlayers || [];
+                allGameLogs = data.gameLogs || {};
                 
-                // Don't call displayPlayers here - let updateAllHitRates handle it
-                updateAllHitRates();
+                // Filter to only players with games played
+                allPlayersData = allPlayersData.filter(p => (p.gamesPlayed || 0) > 0);
+                
+                // Sort by points initially
+                allPlayersData.sort((a, b) => (b.points || 0) - (a.points || 0));
+                
+                filteredPlayers = [...allPlayersData];
+                
+                const statusDiv = document.getElementById('apiStatus');
+                statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | Last updated: ${new Date(data.lastUpdated).toLocaleString()} | ${data.stats.gameLogsLoaded} game logs cached`;
+                statusDiv.style.background = '#d4edda';
+                statusDiv.style.color = '#155724';
+                
+                displayPlayers();
 
             } catch (error) {
                 container.innerHTML = `
                     <div class="error">
-                        <strong>Error loading players:</strong> ${error.message}
-                        <p style="margin-top: 10px;">Make sure you've deployed the backend and updated the API_BASE_URL in the code.</p>
+                        <strong>Error loading cached data:</strong> ${error.message}
+                        <p style="margin-top: 10px;">Make sure you've:</p>
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Deployed the backend to Vercel</li>
+                            <li>Updated the API_BASE_URL in the code</li>
+                            <li>Run the /api/update-data endpoint to populate the cache</li>
+                        </ul>
                     </div>
                 `;
                 console.error('Error:', error);
             }
         }
 
-        async function loadAllGameLogs() {
-            const season = '20252026';  // Updated to 2025-2026 season
-            const gameType = '2';
-            
-            for (let player of topPlayersData) {
-                try {
-                    // Make sure player has a playerId
-                    if (!player.playerId) {
-                        console.warn('Player missing playerId:', player);
-                        continue;
-                    }
-                    
-                    const endpoint = `/v1/player/${player.playerId}/game-log/${season}/${gameType}`;
-                    const gameLog = await fetchFromBackend(endpoint);
-                    allPlayerGameLogs[player.playerId] = gameLog;
-                } catch (error) {
-                    console.error(`Error loading game log for player ${player.playerId}:`, error);
-                }
+        async function refreshData() {
+            if (!confirm('Refresh will fetch fresh data from NHL API. This may take a minute. Continue?')) {
+                return;
             }
+            
+            const statusDiv = document.getElementById('apiStatus');
+            statusDiv.innerHTML = '🔄 Refreshing data from NHL API...';
+            statusDiv.style.background = '#fff3cd';
+            statusDiv.style.color = '#856404';
+            
+            try {
+                // You'll need to set up a CRON_SECRET environment variable in Vercel
+                const response = await fetch(`${API_BASE_URL}/api/update-data`, {
+                    headers: {
+                        'Authorization': `Bearer ${prompt('Enter CRON_SECRET (set in Vercel env vars):')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to refresh data');
+                }
+                
+                const result = await response.json();
+                alert('Data refreshed successfully! Reloading...');
+                location.reload();
+                
+            } catch (error) {
+                alert('Error refreshing data: ' + error.message);
+                statusDiv.innerHTML = '❌ Error refreshing data';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+            }
+        }
+
+        function filterPlayers() {
+            const searchTerm = document.getElementById('searchPlayer').value.toLowerCase();
+            
+            if (searchTerm === '') {
+                filteredPlayers = [...allPlayersData];
+            } else {
+                filteredPlayers = allPlayersData.filter(player => {
+                    const fullName = `${player.skaterFullName || ''}`.toLowerCase();
+                    const firstName = `${player.firstName || ''}`.toLowerCase();
+                    const lastName = `${player.lastName || ''}`.toLowerCase();
+                    return fullName.includes(searchTerm) || 
+                           firstName.includes(searchTerm) || 
+                           lastName.includes(searchTerm);
+                });
+            }
+            
+            displayPlayers();
         }
 
         function displayPlayers() {
             const container = document.getElementById('playersContainer');
+            const sortBy = document.getElementById('sortBy').value;
             
-            let html = topPlayersData.map((player, index) => {
+            // Sort based on selection
+            let playersToDisplay = [...filteredPlayers];
+            
+            if (sortBy === 'hitRate') {
+                playersToDisplay.sort((a, b) => {
+                    const rateA = playerHitRates[a.playerId] || 0;
+                    const rateB = playerHitRates[b.playerId] || 0;
+                    return rateB - rateA;
+                });
+            } else if (sortBy === 'name') {
+                playersToDisplay.sort((a, b) => {
+                    const nameA = a.skaterFullName || '';
+                    const nameB = b.skaterFullName || '';
+                    return nameA.localeCompare(nameB);
+                });
+            } else {
+                playersToDisplay.sort((a, b) => (b.points || 0) - (a.points || 0));
+            }
+            
+            if (playersToDisplay.length === 0) {
+                container.innerHTML = '<div class="loading">No players found matching your search.</div>';
+                return;
+            }
+            
+            let html = playersToDisplay.map((player, index) => {
                 const name = player.skaterFullName || 'Unknown Player';
                 const team = player.teamAbbrevs || 'N/A';
                 const goals = player.goals || 0;
                 const assists = player.assists || 0;
                 const points = player.points || 0;
                 const position = player.positionCode || 'N/A';
+                const gamesPlayed = player.gamesPlayed || 0;
                 
                 return `
                     <div class="player-card" onclick="showGameLog(${player.playerId})">
-                        <div class="player-name">#${index + 1} ${name}</div>
-                        <div class="player-team">${team} - ${position}</div>
+                        <div class="player-name">${name}</div>
+                        <div class="player-team">${team} - ${position} | GP: ${gamesPlayed}</div>
                         <div class="player-stats">
                             <div class="stat">
                                 <div class="stat-label">Goals</div>
@@ -437,7 +507,7 @@
                             </div>
                         </div>
                         <div class="hit-rate-display" id="hitrate-${player.playerId}">
-                            <div class="stat-label">Loading...</div>
+                            <div class="stat-label">Calculating...</div>
                         </div>
                     </div>
                 `;
@@ -450,152 +520,64 @@
         function updateAllHitRates() {
             const statType = document.getElementById('statType').value;
             const lineValue = parseFloat(document.getElementById('lineValue').value);
-            const topCount = parseInt(document.getElementById('topPlayers').value);
 
-            // Calculate hit rates for all players WHO HAVE GAME LOGS
-            const playersWithGameLogs = topPlayersData.filter(player => allPlayerGameLogs[player.playerId]);
-            
-            console.log(`Calculating hit rates for ${playersWithGameLogs.length} players with game logs`);
-            console.log(`Total players in database: ${topPlayersData.length}`);
-            
-            const playersWithHitRates = playersWithGameLogs.map(player => {
-                    const gameLog = allPlayerGameLogs[player.playerId];
-                    if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
-                        return { player, hitRate: -1, hits: 0, total: 0 };
+            filteredPlayers.forEach(player => {
+                const gameLog = allGameLogs[player.playerId];
+                
+                if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
+                    const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                    if (hitRateDiv) {
+                        hitRateDiv.innerHTML = `<div class="stat-label">No game log available</div>`;
                     }
+                    playerHitRates[player.playerId] = 0;
+                    return;
+                }
 
-                    // Use up to 10 games, or however many they've played
-                    const games = gameLog.gameLog.slice(0, 10);
-                    let hits = 0;
+                const games = gameLog.gameLog.slice(0, 10);
+                let hits = 0;
 
-                    // Debug first 3 players to see data structure
-                    if (playersWithGameLogs.indexOf(player) < 3) {
-                        console.log(`Player: ${player.skaterFullName}`, {
-                            totalGames: gameLog.gameLog.length,
-                            last10: games.length,
-                            firstGame: games[0],
-                            statType: statType,
-                            lineValue: lineValue
-                        });
+                games.forEach(game => {
+                    let statValue;
+                    switch(statType) {
+                        case 'points':
+                            statValue = game.points || 0;
+                            break;
+                        case 'goals':
+                            statValue = game.goals || 0;
+                            break;
+                        case 'assists':
+                            statValue = game.assists || 0;
+                            break;
+                        case 'shots':
+                            statValue = game.shots || 0;
+                            break;
                     }
-
-                    games.forEach(game => {
-                        let statValue;
-                        switch(statType) {
-                            case 'points':
-                                statValue = game.points || 0;
-                                break;
-                            case 'goals':
-                                statValue = game.goals || 0;
-                                break;
-                            case 'assists':
-                                statValue = game.assists || 0;
-                                break;
-                            case 'shots':
-                                statValue = game.shots || 0;
-                                break;
-                        }
-                        if (statValue > lineValue) hits++;
-                    });
-
-                    const hitRate = games.length > 0 ? (hits / games.length) * 100 : -1;
-                    return { player, hitRate, hits, total: games.length };
+                    if (statValue > lineValue) hits++;
                 });
 
-            // Sort by hit rate (highest first), then by hits, then by total games
-            playersWithHitRates.sort((a, b) => {
-                // Put players with no game data at the bottom
-                if (a.hitRate === -1 && b.hitRate === -1) return 0;
-                if (a.hitRate === -1) return 1;  // a goes to bottom
-                if (b.hitRate === -1) return -1; // b goes to bottom
+                const hitRate = games.length > 0 ? ((hits / games.length) * 100).toFixed(1) : 0;
+                playerHitRates[player.playerId] = parseFloat(hitRate);
                 
-                // Both have data - sort by hit rate percentage (highest first)
-                if (b.hitRate !== a.hitRate) {
-                    return b.hitRate - a.hitRate;
+                const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                
+                if (hitRateDiv) {
+                    hitRateDiv.innerHTML = `
+                        <div class="stat-label">Last ${games.length} Games Hit Rate</div>
+                        <div class="hit-rate-value">${hitRate}% (${hits}/${games.length})</div>
+                    `;
                 }
-                // If tied on percentage, sort by number of hits (highest first)
-                if (b.hits !== a.hits) {
-                    return b.hits - a.hits;
-                }
-                // If still tied, sort by total season points
-                return (b.player.points || 0) - (a.player.points || 0);
             });
-
-            // Debug: Log top 5 players to verify sorting
-            console.log('=== SORTING DEBUG ===');
-            console.log('Stat Type:', statType);
-            console.log('Line Value:', lineValue);
-            console.log('Total players with game logs:', playersWithHitRates.length);
-            console.log('Top 10 by hit rate:', playersWithHitRates.slice(0, 10).map((p, idx) => ({
-                rank: idx + 1,
-                name: p.player.skaterFullName,
-                hitRate: p.hitRate === -1 ? 'No data' : p.hitRate.toFixed(1) + '%',
-                hits: p.hits,
-                total: p.total,
-                seasonPoints: p.player.points
-            })));
-
-            // Show ALL players sorted by hit rate
-            const container = document.getElementById('playersContainer');
-            
-            // Create header
-            let html = `
-                <div class="player-row header">
-                    <div>Rank</div>
-                    <div>Player</div>
-                    <div>Team</div>
-                    <div>Season G</div>
-                    <div>Season A</div>
-                    <div>Season P</div>
-                    <div>Hit Rate</div>
-                    <div>Action</div>
-                </div>
-            `;
-            
-            // Add all players
-            html += playersWithHitRates.map(({ player, hitRate, hits, total }, index) => {
-                const name = player.skaterFullName || 'Unknown Player';
-                const team = player.teamAbbrevs || 'N/A';
-                const position = player.positionCode || 'N/A';
-                const goals = player.goals || 0;
-                const assists = player.assists || 0;
-                const points = player.points || 0;
-                
-                const hitRateColor = hitRate >= 80 ? 'hit-rate-high' : hitRate >= 50 ? 'hit-rate-medium' : 'hit-rate-low';
-                const hitRateDisplay = hitRate >= 0 ? `${hitRate.toFixed(1)}%` : 'No data';
-                const hitCount = hitRate >= 0 ? `(${hits}/${total})` : '';
-                
-                return `
-                    <div class="player-row" onclick="showGameLog(${player.playerId})">
-                        <div class="rank">#${index + 1}</div>
-                        <div>
-                            <div class="player-name">${name}</div>
-                            <div class="player-team">${team} - ${position}</div>
-                        </div>
-                        <div class="stat-value">${team}</div>
-                        <div class="stat-value">${goals}</div>
-                        <div class="stat-value">${assists}</div>
-                        <div class="stat-value">${points}</div>
-                        <div class="hit-rate-cell">
-                            <div class="hit-rate-value ${hitRateColor}">${hitRateDisplay}</div>
-                            <div style="font-size: 0.9em; color: #666;">${hitCount}</div>
-                        </div>
-                        <div style="text-align: center; color: #2a5298; font-weight: 600;">View Games →</div>
-                    </div>
-                `;
-            }).join('');
-            
-            container.innerHTML = html;
         }
 
         function showGameLog(playerId) {
-            const gameLog = allPlayerGameLogs[playerId];
-            if (!gameLog || !gameLog.gameLog) {
+            const gameLog = allGameLogs[playerId];
+            
+            if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
                 alert('Game log not available for this player');
                 return;
             }
 
-            const player = topPlayersData.find(p => p.playerId === playerId);
+            const player = allPlayersData.find(p => p.playerId === playerId);
             const name = player.skaterFullName || 'Unknown Player';
             const statType = document.getElementById('statType').value;
             const lineValue = parseFloat(document.getElementById('lineValue').value);
@@ -636,7 +618,7 @@
                         <td>${game.points || 0}</td>
                         <td>${game.shots || 0}</td>
                         <td><strong>${statValue}</strong></td>
-                        <td>${hit ? '✓ HIT' : '✗ MISS'}</td>
+                        <td>${hit ? '✔ HIT' : '✗ MISS'}</td>
                     </tr>
                 `;
             }).join('');
@@ -663,7 +645,7 @@
                     </div>
                     <div class="summary-card">
                         <div class="summary-label">Season Points</div>
-                        <div class="summary-value">${player.points || 0}</div>
+                        <div class="summary-value">${player.points}</div>
                     </div>
                 </div>
 
