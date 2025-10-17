@@ -175,44 +175,77 @@ export default async function handler(req, res) {
         const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
           const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,goalie_saves&oddsFormat=american`;
-          console.log('Fetching props for:', event.home_team, 'vs', event.away_team);
+          console.log('Fetching props for event:', eventId, event.home_team, 'vs', event.away_team);
           
-          const propsResponse = await fetch(propsUrl);
-          if (!propsResponse.ok) {
-            console.log('Props fetch failed for event:', eventId, 'Status:', propsResponse.status);
+          try {
+            const propsResponse = await fetch(propsUrl);
+            console.log('Props response status:', propsResponse.status);
+            
+            if (!propsResponse.ok) {
+              const errorText = await propsResponse.text();
+              console.log('Props fetch failed for event:', eventId, 'Status:', propsResponse.status, 'Error:', errorText);
+              return null;
+            }
+            
+            const data = await propsResponse.json();
+            console.log('Props data received for event:', eventId, 'Bookmakers:', data.bookmakers?.length || 0);
+            return { event, data };
+          } catch (e) {
+            console.error('Error fetching props for event:', eventId, e.message);
             return null;
           }
-          return { event, data: await propsResponse.json() };
         });
 
+        console.log('Waiting for all props requests...');
         const allPropsData = await Promise.all(gamePromises);
+        console.log('All props requests completed. Processing', allPropsData.filter(x => x).length, 'successful responses');
         
         let totalOutcomes = 0;
+        let playersProcessed = 0;
+        
         for (const result of allPropsData) {
-          if (!result) continue;
+          if (!result) {
+            console.log('Skipping null result');
+            continue;
+          }
           const { event, data: propsData } = result;
 
-          console.log(`Processing odds for: ${event.home_team} vs ${event.away_team}`);
+          console.log(`\n=== Processing odds for: ${event.home_team} vs ${event.away_team} ===`);
           console.log('Bookmakers found:', propsData.bookmakers?.length || 0);
 
           const bookmaker = propsData.bookmakers?.[0];
           if (!bookmaker) {
-            console.log('No bookmakers for this game');
+            console.log('No bookmakers available for this game');
             continue;
           }
 
-          console.log('Markets available:', bookmaker.markets?.map(m => m.key).join(', '));
+          console.log('Using bookmaker:', bookmaker.title);
+          console.log('Markets available:', bookmaker.markets?.length || 0);
+          
+          if (bookmaker.markets) {
+            bookmaker.markets.forEach(market => {
+              console.log(`  Market: ${market.key}, Outcomes: ${market.outcomes?.length || 0}`);
+            });
+          }
 
           bookmaker.markets?.forEach(market => {
             market.outcomes?.forEach(outcome => {
               const playerName = outcome.description;
-              if (!playerName) return;
-              if (!bettingOdds[playerName]) bettingOdds[playerName] = {};
+              if (!playerName) {
+                console.log('    Skipping outcome without player name');
+                return;
+              }
+              
+              if (!bettingOdds[playerName]) {
+                bettingOdds[playerName] = {};
+                playersProcessed++;
+              }
 
               totalOutcomes++;
 
               if (outcome.name === 'Over' && outcome.point !== undefined) {
                 if (market.key === 'player_points' && !bettingOdds[playerName].points) {
+                  console.log(`    Adding points line for ${playerName}: ${outcome.point}`);
                   bettingOdds[playerName].points = {
                     line: outcome.point,
                     odds: outcome.price,
@@ -221,6 +254,7 @@ export default async function handler(req, res) {
                     gameTime: event.commence_time
                   };
                 } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
+                  console.log(`    Adding assists line for ${playerName}: ${outcome.point}`);
                   bettingOdds[playerName].assists = {
                     line: outcome.point,
                     odds: outcome.price,
@@ -229,6 +263,7 @@ export default async function handler(req, res) {
                     gameTime: event.commence_time
                   };
                 } else if (market.key === 'player_shots_on_goal' && !bettingOdds[playerName].shots) {
+                  console.log(`    Adding shots line for ${playerName}: ${outcome.point}`);
                   bettingOdds[playerName].shots = {
                     line: outcome.point,
                     odds: outcome.price,
@@ -237,6 +272,7 @@ export default async function handler(req, res) {
                     gameTime: event.commence_time
                   };
                 } else if (market.key === 'goalie_saves' && !bettingOdds[playerName].saves) {
+                  console.log(`    Adding saves line for ${playerName}: ${outcome.point}`);
                   bettingOdds[playerName].saves = {
                     line: outcome.point,
                     odds: outcome.price,
@@ -246,8 +282,8 @@ export default async function handler(req, res) {
                   };
                 }
               } else if (market.key === 'player_goal_scorer_anytime' && outcome.name === 'Yes') {
-                // Store anytime goal scorer as goals with 0.5 line
                 if (!bettingOdds[playerName].goals) {
+                  console.log(`    Adding anytime goal for ${playerName}: ${outcome.price}`);
                   bettingOdds[playerName].goals = {
                     line: 0.5,
                     odds: outcome.price,
@@ -262,8 +298,14 @@ export default async function handler(req, res) {
           });
         }
 
+        console.log(`\n=== SUMMARY ===`);
         console.log(`Total outcomes processed: ${totalOutcomes}`);
-        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players/goalies`);
+        console.log(`Unique players processed: ${playersProcessed}`);
+        console.log(`Final betting lines count: ${Object.keys(bettingOdds).length}`);
+        
+        if (Object.keys(bettingOdds).length > 0) {
+          console.log('Sample players with odds:', Object.keys(bettingOdds).slice(0, 5));
+        }
       } else {
         oddsError = 'ODDS_API_KEY not set';
         console.log('Odds API Key not configured');
