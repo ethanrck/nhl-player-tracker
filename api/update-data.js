@@ -126,48 +126,81 @@ export default async function handler(req, res) {
 
     try {
       const oddsApiKey = process.env.ODDS_API_KEY;
+      console.log('Odds API Key exists:', !!oddsApiKey);
+      
       if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
         const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}`;
+        console.log('Fetching events from:', eventsUrl.replace(oddsApiKey, 'KEY_HIDDEN'));
+        
         const eventsResponse = await fetch(eventsUrl);
-        if (!eventsResponse.ok) throw new Error(`Events API error ${eventsResponse.status}`);
+        console.log('Events response status:', eventsResponse.status);
+        
+        if (!eventsResponse.ok) {
+          const errorText = await eventsResponse.text();
+          throw new Error(`Events API error ${eventsResponse.status}: ${errorText}`);
+        }
 
         const events = await eventsResponse.json();
-        const today = new Date().toISOString().split('T')[0];
+        console.log('Total events found:', events.length);
         
-        // Get games for today and tomorrow (to handle timezone issues and late games)
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const twoDaysFromNow = new Date(today);
+        twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+        
+        console.log('Looking for games between:', today.toISOString(), 'and', twoDaysFromNow.toISOString());
         
         const upcomingGames = events.filter(e => {
-          const gameDate = new Date(e.commence_time).toISOString().split('T')[0];
-          return gameDate === today || gameDate === tomorrowStr;
+          const gameTime = new Date(e.commence_time);
+          return gameTime >= today && gameTime <= twoDaysFromNow;
         });
 
-        console.log(`Fetching props for ${upcomingGames.length} upcoming games (today + tomorrow)`);
+        console.log(`Found ${upcomingGames.length} upcoming games in next 2 days`);
+        
+        if (upcomingGames.length > 0) {
+          upcomingGames.forEach(game => {
+            console.log(`Game: ${game.home_team} vs ${game.away_team} at ${game.commence_time}`);
+          });
+        }
 
         const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
           const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,goalie_saves&oddsFormat=american`;
+          console.log('Fetching props for:', event.home_team, 'vs', event.away_team);
+          
           const propsResponse = await fetch(propsUrl);
-          if (!propsResponse.ok) return null;
+          if (!propsResponse.ok) {
+            console.log('Props fetch failed for event:', eventId, 'Status:', propsResponse.status);
+            return null;
+          }
           return { event, data: await propsResponse.json() };
         });
 
         const allPropsData = await Promise.all(gamePromises);
         
+        let totalOutcomes = 0;
         for (const result of allPropsData) {
           if (!result) continue;
           const { event, data: propsData } = result;
 
+          console.log(`Processing odds for: ${event.home_team} vs ${event.away_team}`);
+          console.log('Bookmakers found:', propsData.bookmakers?.length || 0);
+
           const bookmaker = propsData.bookmakers?.[0];
-          if (!bookmaker) continue;
+          if (!bookmaker) {
+            console.log('No bookmakers for this game');
+            continue;
+          }
+
+          console.log('Markets available:', bookmaker.markets?.map(m => m.key).join(', '));
 
           bookmaker.markets?.forEach(market => {
             market.outcomes?.forEach(outcome => {
               const playerName = outcome.description;
               if (!playerName) return;
               if (!bettingOdds[playerName]) bettingOdds[playerName] = {};
+
+              totalOutcomes++;
 
               if (outcome.name === 'Over' && outcome.point !== undefined) {
                 if (market.key === 'player_points' && !bettingOdds[playerName].points) {
@@ -220,9 +253,11 @@ export default async function handler(req, res) {
           });
         }
 
-        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
+        console.log(`Total outcomes processed: ${totalOutcomes}`);
+        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players/goalies`);
       } else {
         oddsError = 'ODDS_API_KEY not set';
+        console.log('Odds API Key not configured');
       }
     } catch (error) {
       oddsError = error.message;
