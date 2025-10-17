@@ -2,9 +2,14 @@
 import { put } from '@vercel/blob';
 
 export default async function handler(req, res) {
+  // Temporarily allow manual testing - REMOVE THIS IN PRODUCTION
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const cronSecret = process.env.CRON_SECRET;
+  
+  if (req.method === 'GET' && req.query.manual === 'true') {
+    console.log('Manual trigger - bypassing auth');
+  } else if (authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: 'Unauthorized', auth: authHeader ? 'present' : 'missing' });
   }
 
   try {
