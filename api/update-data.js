@@ -148,19 +148,23 @@ export default async function handler(req, res) {
         const events = await eventsResponse.json();
         console.log('Total events found:', events.length);
         
+        // Get current date in UTC
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const twoDaysFromNow = new Date(today);
-        twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+        console.log('Current time (UTC):', now.toISOString());
         
-        console.log('Looking for games between:', today.toISOString(), 'and', twoDaysFromNow.toISOString());
+        // Get games happening in the next 48 hours
+        const fortyEightHoursFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
         
         const upcomingGames = events.filter(e => {
           const gameTime = new Date(e.commence_time);
-          return gameTime >= today && gameTime <= twoDaysFromNow;
+          const isUpcoming = gameTime >= now && gameTime <= fortyEightHoursFromNow;
+          if (isUpcoming) {
+            console.log(`Including game: ${e.home_team} vs ${e.away_team} at ${gameTime.toISOString()}`);
+          }
+          return isUpcoming;
         });
 
-        console.log(`Found ${upcomingGames.length} upcoming games in next 2 days`);
+        console.log(`Found ${upcomingGames.length} upcoming games in next 48 hours`);
         
         if (upcomingGames.length > 0) {
           upcomingGames.forEach(game => {
