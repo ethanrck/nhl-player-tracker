@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PuckProphet - NHL Player Line Tracker</title>
-    <link rel="icon" href="/favicon.png" type="image/png">    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏒</text></svg>">
     <style>
         * {
             margin: 0;
@@ -843,14 +843,33 @@
                 // Extract opponent from game string (e.g., "Toronto Maple Leafs vs Boston Bruins")
                 const gameStr = playerOdds[currentStatType].game;
                 const teams = gameStr.split(' vs ');
-                const playerTeam = player.teamAbbrevs;
+                const playerTeamFull = player.teamAbbrevs; // This is the abbreviation like "TOR"
+                
+                // Get full team name from abbreviation
+                const teamFullNames = {
+                    'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
+                    'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
+                    'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
+                    'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
+                    'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
+                    'CAR': 'Carolina Hurricanes', 'NSH': 'Nashville Predators', 'WPG': 'Winnipeg Jets',
+                    'MIN': 'Minnesota Wild', 'COL': 'Colorado Avalanche', 'DAL': 'Dallas Stars',
+                    'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
+                    'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
+                    'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
+                    'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
+                };
+                
+                const playerTeamFullName = teamFullNames[playerTeamFull];
                 
                 // Determine which team is the opponent
-                if (teams[0].includes(playerTeam) || teams[0].toLowerCase().includes(playerTeam.toLowerCase())) {
-                    nextOpponent = teams[1];
+                if (playerTeamFullName && teams[0].trim() === playerTeamFullName) {
+                    nextOpponent = teams[1].trim();
                 } else {
-                    nextOpponent = teams[0];
+                    nextOpponent = teams[0].trim();
                 }
+                
+                console.log('Next opponent detected:', nextOpponent);
             }
 
             const games = gameLog.gameLog.slice(0, 10);
@@ -891,15 +910,17 @@
             if (nextOpponent) {
                 // Try to match opponent abbreviation from full name
                 const allGames = gameLog.gameLog;
-                const h2hStats = calculateH2HStats(allGames, null, nextOpponent);
+                const h2hStats = calculateH2HStats(allGames, nextOpponent);
+                
+                console.log('H2H Stats:', h2hStats);
                 
                 if (h2hStats && h2hStats.games > 0) {
-                    const h2hHitRate = calculateH2HHitRate(allGames, nextOpponent, lineValue);
+                    const h2hHitRate = calculateH2HHitRate(allGames, h2hStats.opponentAbbrev, lineValue);
                     const h2hColorClass = getHitRateColor(h2hHitRate);
                     
                     h2hSection = `
                         <div class="h2h-section">
-                            <div class="h2h-title">📊 Head-to-Head vs ${h2hStats.opponentName || nextOpponent}</div>
+                            <div class="h2h-title">📊 Head-to-Head vs ${nextOpponent} (Last ${h2hStats.games} games)</div>
                             <div class="h2h-stats">
                                 <div class="h2h-stat">
                                     <div class="h2h-stat-label">Games</div>
@@ -922,12 +943,14 @@
                                     <div class="h2h-stat-value">${h2hStats.avgShots}</div>
                                 </div>
                                 <div class="h2h-stat">
-                                    <div class="h2h-stat-label">Hit Rate vs Line</div>
+                                    <div class="h2h-stat-label">Hit Rate vs ${lineValue}</div>
                                     <div class="h2h-stat-value ${h2hColorClass}">${h2hHitRate.toFixed(1)}%</div>
                                 </div>
                             </div>
                         </div>
                     `;
+                } else {
+                    console.log('No H2H games found for opponent:', nextOpponent);
                 }
             }
             
@@ -1006,61 +1029,57 @@
             document.getElementById('gameLogModal').style.display = 'block';
         }
 
-        function calculateH2HStats(allGames, opponentAbbrev, opponentFullName) {
-            // Try to find games against this opponent
-            let h2hGames = [];
-            let matchedOpponent = '';
-            
-            // Team name mappings for matching
+        function calculateH2HStats(allGames, opponentFullName) {
+            // Team name mappings for matching full names to abbreviations
             const teamMappings = {
-                'Maple Leafs': 'TOR',
-                'Bruins': 'BOS',
-                'Lightning': 'TBL',
-                'Panthers': 'FLA',
-                'Canadiens': 'MTL',
-                'Senators': 'OTT',
-                'Sabres': 'BUF',
-                'Red Wings': 'DET',
-                'Rangers': 'NYR',
-                'Islanders': 'NYI',
-                'Devils': 'NJD',
-                'Penguins': 'PIT',
-                'Capitals': 'WSH',
-                'Flyers': 'PHI',
-                'Blue Jackets': 'CBJ',
-                'Hurricanes': 'CAR',
-                'Predators': 'NSH',
-                'Jets': 'WPG',
-                'Wild': 'MIN',
-                'Avalanche': 'COL',
-                'Stars': 'DAL',
-                'Blackhawks': 'CHI',
-                'Blues': 'STL',
-                'Golden Knights': 'VGK',
-                'Oilers': 'EDM',
-                'Flames': 'CGY',
-                'Canucks': 'VAN',
-                'Kraken': 'SEA',
-                'Sharks': 'SJS',
-                'Ducks': 'ANA',
-                'Kings': 'LAK',
-                'Coyotes': 'ARI'
+                'Toronto Maple Leafs': 'TOR',
+                'Boston Bruins': 'BOS',
+                'Tampa Bay Lightning': 'TBL',
+                'Florida Panthers': 'FLA',
+                'Montreal Canadiens': 'MTL',
+                'Ottawa Senators': 'OTT',
+                'Buffalo Sabres': 'BUF',
+                'Detroit Red Wings': 'DET',
+                'New York Rangers': 'NYR',
+                'New York Islanders': 'NYI',
+                'New Jersey Devils': 'NJD',
+                'Pittsburgh Penguins': 'PIT',
+                'Washington Capitals': 'WSH',
+                'Philadelphia Flyers': 'PHI',
+                'Columbus Blue Jackets': 'CBJ',
+                'Carolina Hurricanes': 'CAR',
+                'Nashville Predators': 'NSH',
+                'Winnipeg Jets': 'WPG',
+                'Minnesota Wild': 'MIN',
+                'Colorado Avalanche': 'COL',
+                'Dallas Stars': 'DAL',
+                'Chicago Blackhawks': 'CHI',
+                'St. Louis Blues': 'STL',
+                'Vegas Golden Knights': 'VGK',
+                'Edmonton Oilers': 'EDM',
+                'Calgary Flames': 'CGY',
+                'Vancouver Canucks': 'VAN',
+                'Seattle Kraken': 'SEA',
+                'San Jose Sharks': 'SJS',
+                'Anaheim Ducks': 'ANA',
+                'Los Angeles Kings': 'LAK',
+                'Arizona Coyotes': 'ARI',
+                'Utah Hockey Club': 'UTA'
             };
             
             // Find the abbreviation from full name
-            if (opponentFullName) {
-                for (const [key, abbrev] of Object.entries(teamMappings)) {
-                    if (opponentFullName.includes(key)) {
-                        opponentAbbrev = abbrev;
-                        matchedOpponent = opponentFullName;
-                        break;
-                    }
-                }
+            const opponentAbbrev = teamMappings[opponentFullName];
+            
+            if (!opponentAbbrev) {
+                console.log('Could not find abbreviation for:', opponentFullName);
+                return null;
             }
             
-            if (!opponentAbbrev) return null;
+            console.log('Looking for games against:', opponentAbbrev);
             
-            h2hGames = allGames.filter(game => game.opponentAbbrev === opponentAbbrev);
+            const h2hGames = allGames.filter(game => game.opponentAbbrev === opponentAbbrev);
+            
+            console.log('Found', h2hGames.length, 'games against', opponentAbbrev);
             
             if (h2hGames.length === 0) return null;
             
@@ -1085,34 +1104,11 @@
                 totalGoals,
                 totalAssists,
                 totalPoints,
-                opponentAbbrev,
-                opponentName: matchedOpponent
+                opponentAbbrev
             };
         }
 
-        function calculateH2HHitRate(allGames, opponentFullName, lineValue) {
-            // Find opponent abbreviation
-            const teamMappings = {
-                'Maple Leafs': 'TOR', 'Bruins': 'BOS', 'Lightning': 'TBL', 'Panthers': 'FLA',
-                'Canadiens': 'MTL', 'Senators': 'OTT', 'Sabres': 'BUF', 'Red Wings': 'DET',
-                'Rangers': 'NYR', 'Islanders': 'NYI', 'Devils': 'NJD', 'Penguins': 'PIT',
-                'Capitals': 'WSH', 'Flyers': 'PHI', 'Blue Jackets': 'CBJ', 'Hurricanes': 'CAR',
-                'Predators': 'NSH', 'Jets': 'WPG', 'Wild': 'MIN', 'Avalanche': 'COL',
-                'Stars': 'DAL', 'Blackhawks': 'CHI', 'Blues': 'STL', 'Golden Knights': 'VGK',
-                'Oilers': 'EDM', 'Flames': 'CGY', 'Canucks': 'VAN', 'Kraken': 'SEA',
-                'Sharks': 'SJS', 'Ducks': 'ANA', 'Kings': 'LAK', 'Coyotes': 'ARI'
-            };
-            
-            let opponentAbbrev = null;
-            for (const [key, abbrev] of Object.entries(teamMappings)) {
-                if (opponentFullName.includes(key)) {
-                    opponentAbbrev = abbrev;
-                    break;
-                }
-            }
-            
-            if (!opponentAbbrev) return 0;
-            
+        function calculateH2HHitRate(allGames, opponentAbbrev, lineValue) {
             const h2hGames = allGames.filter(game => game.opponentAbbrev === opponentAbbrev);
             
             if (h2hGames.length === 0) return 0;
