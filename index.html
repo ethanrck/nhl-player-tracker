@@ -950,6 +950,15 @@
                         </div>
                     `;
                 } else {
+                    // Show message when no H2H history exists
+                    h2hSection = `
+                        <div class="h2h-section" style="background: var(--card-bg); border: 2px dashed var(--input-border);">
+                            <div class="h2h-title" style="color: var(--text-secondary);">📊 Head-to-Head vs ${nextOpponent}</div>
+                            <div style="text-align: center; padding: 15px; color: var(--text-secondary); font-style: italic;">
+                                No previous games vs ${nextOpponent} this season
+                            </div>
+                        </div>
+                    `;
                     console.log('No H2H games found for opponent:', nextOpponent);
                 }
             }
