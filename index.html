@@ -641,6 +641,8 @@
             // Switch between skaters and goalies
             if (isGoalieMode) {
                 filteredPlayers = [...allGoaliesData];
+                // Uncheck "hide no lines" for goalies since they don't have betting lines yet
+                document.getElementById('hideNoLines').checked = false;
             } else {
                 filteredPlayers = [...allPlayersData];
             }
@@ -943,15 +945,21 @@
         }
 
         function showGameLog(playerId) {
-            const gameLog = allGameLogs[playerId];
+            // Check if it's a goalie or player
+            const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
+            const playerSource = isGoalieMode ? allGoaliesData : allPlayersData;
+            
+            const gameLog = gameLogSource[playerId];
             
             if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
-                alert('Game log not available for this player');
+                alert('Game log not available for this ' + (isGoalieMode ? 'goalie' : 'player'));
                 return;
             }
 
-            const player = allPlayersData.find(p => p.playerId === playerId);
-            const name = player.skaterFullName || 'Unknown Player';
+            const player = playerSource.find(p => p.playerId === playerId);
+            const name = isGoalieMode ? 
+                (player.goalieFullName || 'Unknown Goalie') : 
+                (player.skaterFullName || 'Unknown Player');
             
             const playerOdds = bettingOdds[name];
             let lineValue = 0.5;
@@ -996,10 +1004,14 @@
 
             const gameRows = games.map(game => {
                 let statValue = 0;
-                if (currentStatType === 'points') statValue = game.points || 0;
-                else if (currentStatType === 'goals') statValue = game.goals || 0;
-                else if (currentStatType === 'assists') statValue = game.assists || 0;
-                else if (currentStatType === 'shots') statValue = game.shots || 0;
+                if (isGoalieMode) {
+                    statValue = game.saveShotsAgainst || game.saves || 0;
+                } else {
+                    if (currentStatType === 'points') statValue = game.points || 0;
+                    else if (currentStatType === 'goals') statValue = game.goals || 0;
+                    else if (currentStatType === 'assists') statValue = game.assists || 0;
+                    else if (currentStatType === 'shots') statValue = game.shots || 0;
+                }
 
                 const hit = statValue > lineValue;
                 if (hit) hits++;
@@ -1008,17 +1020,31 @@
                 const homeAway = game.homeRoadFlag === 'H' ? 'vs' : '@';
                 const gameDate = new Date(game.gameDate).toLocaleDateString();
 
-                return `
-                    <tr class="${hit ? 'hit' : 'miss'}">
-                        <td>${gameDate}</td>
-                        <td>${homeAway} ${opponent}</td>
-                        <td>${game.goals || 0}</td>
-                        <td>${game.assists || 0}</td>
-                        <td>${game.points || 0}</td>
-                        <td>${game.shots || 0}</td>
-                        <td><strong>${statValue}</strong></td>
-                    </tr>
-                `;
+                if (isGoalieMode) {
+                    return `
+                        <tr class="${hit ? 'hit' : 'miss'}">
+                            <td>${gameDate}</td>
+                            <td>${homeAway} ${opponent}</td>
+                            <td>${game.saveShotsAgainst || game.saves || 0}</td>
+                            <td>${game.goalsAgainst || 0}</td>
+                            <td>${game.savePct ? (game.savePct * 100).toFixed(1) + '%' : 'N/A'}</td>
+                            <td>${game.decision || '-'}</td>
+                            <td><strong>${statValue}</strong></td>
+                        </tr>
+                    `;
+                } else {
+                    return `
+                        <tr class="${hit ? 'hit' : 'miss'}">
+                            <td>${gameDate}</td>
+                            <td>${homeAway} ${opponent}</td>
+                            <td>${game.goals || 0}</td>
+                            <td>${game.assists || 0}</td>
+                            <td>${game.points || 0}</td>
+                            <td>${game.shots || 0}</td>
+                            <td><strong>${statValue}</strong></td>
+                        </tr>
+                    `;
+                }
             }).join('');
 
             const hitRate = ((hits / games.length) * 100).toFixed(1);
@@ -1102,11 +1128,34 @@
                     </div>
                 `;
             }
+            
+            // Get season stats for display
+            let seasonStatsCard = '';
+            if (isGoalieMode) {
+                seasonStatsCard = `
+                    <div class="summary-card">
+                        <div class="summary-label">Season Saves</div>
+                        <div class="summary-value">${player.saves || 0}</div>
+                    </div>
+                `;
+            } else {
+                seasonStatsCard = `
+                    <div class="summary-card">
+                        <div class="summary-label">Season Points</div>
+                        <div class="summary-value">${player.points}</div>
+                    </div>
+                `;
+            }
 
             const modalContent = document.getElementById('modalContent');
+            
+            const tableHeaders = isGoalieMode ? 
+                '<th>Date</th><th>Opponent</th><th>Saves</th><th>GA</th><th>SV%</th><th>Decision</th><th>Saves</th>' :
+                '<th>Date</th><th>Opponent</th><th>Goals</th><th>Assists</th><th>Points</th><th>Shots</th><th>' + currentStatType.charAt(0).toUpperCase() + currentStatType.slice(1) + '</th>';
+            
             modalContent.innerHTML = `
                 <h2>${name}</h2>
-                <p>${player.teamAbbrevs} - ${player.positionCode}</p>
+                <p>${player.teamAbbrevs} - ${isGoalieMode ? 'G' : player.positionCode}</p>
                 
                 <div class="summary-stats">
                     <div class="summary-card">
@@ -1118,10 +1167,7 @@
                         <div class="summary-value">${hits}/${games.length}</div>
                     </div>
                     ${oddsCard}
-                    <div class="summary-card">
-                        <div class="summary-label">Season Points</div>
-                        <div class="summary-value">${player.points}</div>
-                    </div>
+                    ${seasonStatsCard}
                 </div>
                 
                 ${playerOdds && playerOdds[currentStatType] ? `
@@ -1139,13 +1185,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Opponent</th>
-                            <th>Goals</th>
-                            <th>Assists</th>
-                            <th>Points</th>
-                            <th>Shots</th>
-                            <th>${currentStatType.charAt(0).toUpperCase() + currentStatType.slice(1)}</th>
+                            ${tableHeaders}
                         </tr>
                     </thead>
                     <tbody>
