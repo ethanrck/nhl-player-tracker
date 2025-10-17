@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+</div>
+                    <div class="summary-card">
+                        <div class="summary-label">Hits</div>
+                        <div class="summary-value">${hits}/${gamesToShow.length}</div>
+                    </div><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -999,10 +1003,21 @@
                 console.log('Next opponent detected:', nextOpponent);
             }
 
-            const games = gameLog.gameLog.slice(0, 10);
-            let hits = 0;
+            // For goalies, filter out games they didn't play and get last 10 PLAYED games
+            let gamesToShow;
+            if (isGoalieMode) {
+                // Filter games where goalie actually played (has saves > 0 or decision exists)
+                const playedGames = gameLog.gameLog.filter(game => {
+                    const saves = game.saveShotsAgainst || game.saves || 0;
+                    const hasDecision = game.decision && game.decision !== 'O';
+                    return saves > 0 || hasDecision;
+                });
+                gamesToShow = playedGames.slice(0, 10);
+            } else {
+                gamesToShow = gameLog.gameLog.slice(0, 10);
+            }
 
-            const gameRows = games.map(game => {
+            const gameRows = gamesToShow.map(game => {
                 let statValue = 0;
                 if (isGoalieMode) {
                     statValue = game.saveShotsAgainst || game.saves || 0;
@@ -1047,7 +1062,7 @@
                 }
             }).join('');
 
-            const hitRate = ((hits / games.length) * 100).toFixed(1);
+            const hitRate = gamesToShow.length > 0 ? ((hits / gamesToShow.length) * 100).toFixed(1) : 0;
             const colorClass = getHitRateColor(parseFloat(hitRate));
             
             // Calculate H2H stats if we have a next opponent
@@ -1181,7 +1196,7 @@
                 
                 ${h2hSection}
 
-                <h3>Last ${games.length} Games</h3>
+                <h3>Last ${gamesToShow.length} Games</h3>
                 <table>
                     <thead>
                         <tr>
