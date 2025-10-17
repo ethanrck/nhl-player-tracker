@@ -114,7 +114,7 @@ export default async function handler(req, res) {
         // Fetch all props in parallel
         const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
-          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal&oddsFormat=american`;
+          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,player_total_saves&oddsFormat=american`;
           
           try {
             const propsResponse = await fetch(propsUrl);
@@ -160,6 +160,14 @@ export default async function handler(req, res) {
                   };
                 } else if (market.key === 'player_shots_on_goal' && !bettingOdds[playerName].shots) {
                   bettingOdds[playerName].shots = {
+                    line: outcome.point,
+                    odds: outcome.price,
+                    bookmaker: bookmaker.title,
+                    game: `${event.home_team} vs ${event.away_team}`,
+                    gameTime: event.commence_time
+                  };
+                } else if (market.key === 'player_total_saves' && !bettingOdds[playerName].saves) {
+                  bettingOdds[playerName].saves = {
                     line: outcome.point,
                     odds: outcome.price,
                     bookmaker: bookmaker.title,
