@@ -3,34 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PuckProphet</title>
+    <title>PuckProphet - NHL Player Line Tracker</title>
     <style>
-        :root {
-            --bg-gradient-start: #1e3c72;
-            --bg-gradient-end: #2a5298;
-            --container-bg: white;
-            --text-primary: #1e3c72;
-            --text-secondary: #666;
-            --card-bg: #f8f9fa;
-            --border-color: #ddd;
-            --hover-shadow: rgba(0,0,0,0.2);
-            --success-bg: #d4edda;
-            --success-text: #155724;
-        }
-        
-        [data-theme="dark"] {
-            --bg-gradient-start: #0a1929;
-            --bg-gradient-end: #1a2332;
-            --container-bg: #1e2936;
-            --text-primary: #e3f2fd;
-            --text-secondary: #b0bec5;
-            --card-bg: #263238;
-            --border-color: #37474f;
-            --hover-shadow: rgba(255,255,255,0.1);
-            --success-bg: #1b5e20;
-            --success-text: #c8e6c9;
-        }
-        
         * {
             margin: 0;
             padding: 0;
@@ -39,59 +13,41 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             min-height: 100vh;
             padding: 20px;
-            transition: background 0.3s ease;
         }
         
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: var(--container-bg);
+            background: white;
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            transition: background 0.3s ease;
-        }
-        
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
         }
         
         h1 {
-            color: var(--text-primary);
+            color: #1e3c72;
             text-align: center;
+            margin-bottom: 10px;
             font-size: 2.5em;
-            transition: color 0.3s ease;
         }
         
-        .theme-toggle {
-            background: var(--card-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 50px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 1.2em;
-            transition: all 0.3s ease;
-        }
-        
-        .theme-toggle:hover {
-            transform: scale(1.1);
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
         }
         
         .api-status {
-            background: var(--success-bg);
-            color: var(--success-text);
+            background: #fff3cd;
+            color: #856404;
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 20px;
             text-align: center;
             font-size: 14px;
-            transition: all 0.3s ease;
         }
         
         .controls {
@@ -100,10 +56,9 @@
             margin-bottom: 30px;
             flex-wrap: wrap;
             align-items: center;
-            background: var(--card-bg);
+            background: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
-            transition: background 0.3s ease;
         }
         
         .control-group {
@@ -114,18 +69,14 @@
         
         label {
             font-weight: 600;
-            color: var(--text-secondary);
-            transition: color 0.3s ease;
+            color: #333;
         }
         
         input[type="text"], input[type="checkbox"] {
             padding: 10px;
             font-size: 16px;
-            border: 2px solid var(--border-color);
+            border: 2px solid #ddd;
             border-radius: 8px;
-            background: var(--container-bg);
-            color: var(--text-primary);
-            transition: all 0.3s ease;
         }
         
         input[type="checkbox"] {
@@ -142,7 +93,7 @@
         
         .stat-button {
             padding: 12px 24px;
-            background: var(--container-bg);
+            background: white;
             color: #2a5298;
             border: 2px solid #2a5298;
             border-radius: 8px;
@@ -153,7 +104,7 @@
         }
         
         .stat-button:hover {
-            background: var(--card-bg);
+            background: #f0f0f0;
         }
         
         .stat-button.active {
@@ -174,7 +125,7 @@
         }
         
         .player-card {
-            background: var(--card-bg);
+            background: #f8f9fa;
             border-radius: 10px;
             padding: 20px;
             cursor: pointer;
@@ -184,7 +135,7 @@
         
         .player-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px var(--hover-shadow);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             border-color: #2a5298;
         }
         
@@ -198,9 +149,8 @@
         .player-name {
             font-size: 1.2em;
             font-weight: bold;
-            color: var(--text-primary);
+            color: #1e3c72;
             flex: 1;
-            transition: color 0.3s ease;
         }
         
         .odds-line {
@@ -215,10 +165,9 @@
         }
         
         .player-team {
-            color: var(--text-secondary);
+            color: #666;
             font-size: 0.9em;
             margin-bottom: 10px;
-            transition: color 0.3s ease;
         }
         
         .player-stats {
@@ -234,24 +183,21 @@
         
         .stat-label {
             font-size: 0.8em;
-            color: var(--text-secondary);
-            transition: color 0.3s ease;
+            color: #666;
         }
         
         .stat-value {
             font-size: 1.3em;
             font-weight: bold;
-            color: var(--text-primary);
-            transition: color 0.3s ease;
+            color: #1e3c72;
         }
         
         .hit-rate-display {
             margin-top: 10px;
             padding: 10px;
-            background: var(--container-bg);
+            background: white;
             border-radius: 5px;
             text-align: center;
-            transition: background 0.3s ease;
         }
         
         .hit-rate-value {
@@ -278,7 +224,7 @@
         .loading {
             text-align: center;
             padding: 40px;
-            color: var(--text-secondary);
+            color: #666;
             font-size: 18px;
         }
         
@@ -304,18 +250,12 @@
         }
         
         .modal-content {
-            background: var(--container-bg);
+            background: white;
             max-width: 1000px;
             margin: 20px auto;
             border-radius: 15px;
             padding: 30px;
             position: relative;
-            transition: background 0.3s ease;
-        }
-        
-        .modal-content h2, .modal-content h3, .modal-content p {
-            color: var(--text-primary);
-            transition: color 0.3s ease;
         }
         
         .close-modal {
@@ -324,12 +264,11 @@
             right: 20px;
             font-size: 30px;
             cursor: pointer;
-            color: var(--text-secondary);
-            transition: color 0.3s ease;
+            color: #666;
         }
         
         .close-modal:hover {
-            color: var(--text-primary);
+            color: #000;
         }
         
         table {
@@ -347,29 +286,19 @@
         
         td {
             padding: 12px;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-primary);
-            transition: all 0.3s ease;
+            border-bottom: 1px solid #ddd;
         }
         
         tr:hover {
-            background: var(--card-bg);
+            background: #f9f9f9;
         }
         
         .hit {
             background-color: #d4edda !important;
         }
         
-        [data-theme="dark"] .hit {
-            background-color: #1b5e20 !important;
-        }
-        
         .miss {
             background-color: #f8d7da !important;
-        }
-        
-        [data-theme="dark"] .miss {
-            background-color: #7f1d1d !important;
         }
         
         .summary-stats {
@@ -380,75 +309,29 @@
         }
         
         .summary-card {
-            background: var(--card-bg);
+            background: #f8f9fa;
             padding: 15px;
             border-radius: 8px;
             text-align: center;
-            transition: background 0.3s ease;
         }
         
         .summary-label {
             font-size: 0.9em;
-            color: var(--text-secondary);
+            color: #666;
             margin-bottom: 5px;
-            transition: color 0.3s ease;
         }
         
         .summary-value {
             font-size: 1.8em;
             font-weight: bold;
-            color: var(--text-primary);
-            transition: color 0.3s ease;
-        }
-        
-        .h2h-section {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #2a5298;
-            transition: background 0.3s ease;
-        }
-        
-        .h2h-title {
-            font-size: 0.9em;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-            font-weight: 600;
-            transition: color 0.3s ease;
-        }
-        
-        .h2h-stats {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .h2h-stat {
-            flex: 1;
-            min-width: 100px;
-        }
-        
-        .h2h-label {
-            font-size: 0.8em;
-            color: var(--text-secondary);
-            transition: color 0.3s ease;
-        }
-        
-        .h2h-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #2a5298;
+            color: #1e3c72;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-row">
-            <div style="width: 40px;"></div>
-            <h1>🏒 PuckProphet</h1>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
-        </div>
+        <h1>🏒 PuckProphet</h1>
+        <p class="subtitle">NHL Player Line Tracker - 2025-2026 Season</p>
         
         <div class="api-status" id="apiStatus">
             📄 Loading cached data...
@@ -466,8 +349,8 @@
             </div>
         </div>
         
-        <div style="background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; transition: background 0.3s ease;">
-            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: var(--text-secondary); transition: color 0.3s ease;">Select Stat:</label>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #333;">Select Stat:</label>
             <div class="stat-buttons">
                 <button class="stat-button active" onclick="selectStat('points')">Points</button>
                 <button class="stat-button" onclick="selectStat('goals')">Goals</button>
@@ -498,24 +381,7 @@
         let bettingOdds = {};
         let currentStatType = 'points';
 
-        // Dark mode handling
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            
-            const toggle = document.querySelector('.theme-toggle');
-            toggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
-
-        // Load saved theme
         window.onload = function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            const toggle = document.querySelector('.theme-toggle');
-            toggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-            
             loadCachedData();
         };
 
@@ -542,6 +408,8 @@
                 const statusDiv = document.getElementById('apiStatus');
                 const bettingLinesCount = data.stats?.bettingLinesLoaded || 0;
                 statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
+                statusDiv.style.background = '#d4edda';
+                statusDiv.style.color = '#155724';
                 
                 displayPlayers();
 
@@ -588,33 +456,6 @@
             if (hitRate >= 50) return 'hit-rate-good';
             if (hitRate >= 30) return 'hit-rate-medium';
             return 'hit-rate-poor';
-        }
-        
-        function getH2HStats(player, opponentTeam) {
-            const gameLog = allGameLogs[player.playerId];
-            if (!gameLog || !gameLog.gameLog) return null;
-            
-            const h2hGames = gameLog.gameLog.filter(game => 
-                game.opponentAbbrev === opponentTeam
-            );
-            
-            if (h2hGames.length === 0) return null;
-            
-            const totalGames = h2hGames.length;
-            const totalGoals = h2hGames.reduce((sum, g) => sum + (g.goals || 0), 0);
-            const totalAssists = h2hGames.reduce((sum, g) => sum + (g.assists || 0), 0);
-            const totalPoints = h2hGames.reduce((sum, g) => sum + (g.points || 0), 0);
-            const totalShots = h2hGames.reduce((sum, g) => sum + (g.shots || 0), 0);
-            
-            return {
-                games: totalGames,
-                goals: totalGoals,
-                assists: totalAssists,
-                points: totalPoints,
-                shots: totalShots,
-                avgPoints: (totalPoints / totalGames).toFixed(1),
-                avgShots: (totalShots / totalGames).toFixed(1)
-            };
         }
 
         function displayPlayers() {
@@ -827,3 +668,94 @@
                         <td><strong>${statValue}</strong></td>
                     </tr>
                 `;
+            }).join('');
+
+            const hitRate = ((hits / games.length) * 100).toFixed(1);
+            const colorClass = getHitRateColor(parseFloat(hitRate));
+            
+            let oddsCard = '';
+            if (playerOdds && playerOdds[currentStatType]) {
+                const oddsInfo = playerOdds[currentStatType];
+                const formattedOdds = oddsInfo.odds > 0 ? `+${oddsInfo.odds}` : oddsInfo.odds;
+                
+                let oddsLabel = 'Betting Line';
+                let oddsValue = `O/U ${oddsInfo.line} ${formattedOdds}`;
+                
+                if (currentStatType === 'goals' && oddsInfo.type === 'anytime_scorer') {
+                    oddsLabel = 'Anytime Goal Scorer';
+                    oddsValue = formattedOdds;
+                }
+                
+                oddsCard = `
+                    <div class="summary-card">
+                        <div class="summary-label">${oddsLabel}</div>
+                        <div class="summary-value" style="color: #e67e22; font-size: 1.5em;">${oddsValue}</div>
+                    </div>
+                `;
+            }
+
+            const modalContent = document.getElementById('modalContent');
+            modalContent.innerHTML = `
+                <h2>${name}</h2>
+                <p>${player.teamAbbrevs} - ${player.positionCode}</p>
+                
+                <div class="summary-stats">
+                    <div class="summary-card">
+                        <div class="summary-label">Hit Rate</div>
+                        <div class="summary-value ${colorClass}">${hitRate}%</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Hits</div>
+                        <div class="summary-value">${hits}/${games.length}</div>
+                    </div>
+                    ${oddsCard}
+                    <div class="summary-card">
+                        <div class="summary-label">Season Points</div>
+                        <div class="summary-value">${player.points}</div>
+                    </div>
+                </div>
+                
+                ${playerOdds && playerOdds[currentStatType] ? `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                        <div style="font-size: 0.9em; color: #856404; margin-bottom: 5px; font-weight: 600;">📅 This Game</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: #1e3c72;">${playerOdds[currentStatType].game}</div>
+                        <div style="font-size: 0.85em; color: #666; margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                        <div style="font-size: 0.85em; color: #666; margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
+                    </div>
+                ` : ''}
+
+                <h3>Last ${games.length} Games</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Opponent</th>
+                            <th>Goals</th>
+                            <th>Assists</th>
+                            <th>Points</th>
+                            <th>Shots</th>
+                            <th>${currentStatType.charAt(0).toUpperCase() + currentStatType.slice(1)}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${gameRows}
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('gameLogModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('gameLogModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('gameLogModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
