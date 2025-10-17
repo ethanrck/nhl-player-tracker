@@ -510,6 +510,7 @@
                 <button class="stat-button" onclick="selectStat('goals')">Goals</button>
                 <button class="stat-button" onclick="selectStat('assists')">Assists</button>
                 <button class="stat-button" onclick="selectStat('shots')">Shots</button>
+                <button class="stat-button" onclick="selectStat('saves')">Goalie Saves</button>
             </div>
         </div>
         
@@ -529,11 +530,14 @@
         const API_BASE_URL = 'https://nhl-player-tracker.vercel.app';
         
         let allPlayersData = [];
+        let allGoaliesData = [];
         let allGameLogs = {};
+        let allGoalieGameLogs = {};
         let filteredPlayers = [];
         let playerHitRates = {};
         let bettingOdds = {};
         let currentStatType = 'points';
+        let isGoalieMode = false;
 
         // Dark mode toggle
         function toggleDarkMode() {
@@ -569,15 +573,19 @@
                 const data = await response.json();
                 
                 allPlayersData = data.allPlayers || [];
+                allGoaliesData = data.allGoalies || [];
                 allGameLogs = data.gameLogs || {};
+                allGoalieGameLogs = data.goalieGameLogs || {};
                 bettingOdds = data.bettingOdds || {};
                 
                 allPlayersData = allPlayersData.filter(p => (p.gamesPlayed || 0) > 0);
+                allGoaliesData = allGoaliesData.filter(g => (g.gamesPlayed || 0) > 0);
                 filteredPlayers = [...allPlayersData];
                 
                 const statusDiv = document.getElementById('apiStatus');
                 const bettingLinesCount = data.stats?.bettingLinesLoaded || 0;
-                statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
+                const goalieCount = allGoaliesData.length;
+                statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${goalieCount} goalies | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
                 statusDiv.style.background = 'var(--success-bg)';
                 statusDiv.style.color = 'var(--success-text)';
                 
@@ -592,26 +600,40 @@
 
         function selectStat(stat) {
             currentStatType = stat;
+            isGoalieMode = (stat === 'saves');
             
             document.querySelectorAll('.stat-button').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent.toLowerCase() === stat) {
+                if (btn.textContent.toLowerCase().includes(stat)) {
                     btn.classList.add('active');
                 }
             });
             
-            displayPlayers();
+            // Switch between skaters and goalies
+            if (isGoalieMode) {
+                filteredPlayers = [...allGoaliesData];
+            } else {
+                filteredPlayers = [...allPlayersData];
+            }
+            
+            filterPlayers();
         }
 
         function filterPlayers() {
             const searchTerm = document.getElementById('searchPlayer').value.toLowerCase();
             const hideNoLines = document.getElementById('hideNoLines').checked;
             
-            filteredPlayers = allPlayersData.filter(player => {
-                const fullName = `${player.skaterFullName || ''}`.toLowerCase();
+            const sourceData = isGoalieMode ? allGoaliesData : allPlayersData;
+            
+            filteredPlayers = sourceData.filter(player => {
+                const fullName = isGoalieMode ? 
+                    `${player.goalieFullName || ''}`.toLowerCase() : 
+                    `${player.skaterFullName || ''}`.toLowerCase();
                 const matchesSearch = searchTerm === '' || fullName.includes(searchTerm);
                 
-                const name = player.skaterFullName || 'Unknown Player';
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown Goalie') : 
+                    (player.skaterFullName || 'Unknown Player');
                 const playerOdds = bettingOdds[name];
                 const hasLine = playerOdds && playerOdds[currentStatType];
                 const passesLineFilter = !hideNoLines || hasLine;
@@ -633,7 +655,9 @@
             const container = document.getElementById('playersContainer');
             
             const playersWithHitRates = filteredPlayers.map(player => {
-                const name = player.skaterFullName || 'Unknown Player';
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown Goalie') : 
+                    (player.skaterFullName || 'Unknown Player');
                 const playerOdds = bettingOdds[name];
                 const hasOdds = playerOdds && playerOdds[currentStatType];
                 
@@ -642,7 +666,8 @@
                     lineValue = playerOdds[currentStatType].line;
                 }
                 
-                const gameLog = allGameLogs[player.playerId];
+                const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
+                const gameLog = gameLogSource[player.playerId];
                 let hitRate = 0;
                 let gamesPlayed = 0;
                 
@@ -653,10 +678,14 @@
                     
                     games.forEach(game => {
                         let statValue = 0;
-                        if (currentStatType === 'points') statValue = game.points || 0;
-                        else if (currentStatType === 'goals') statValue = game.goals || 0;
-                        else if (currentStatType === 'assists') statValue = game.assists || 0;
-                        else if (currentStatType === 'shots') statValue = game.shots || 0;
+                        if (isGoalieMode) {
+                            statValue = game.saveShotsAgainst || game.saves || 0;
+                        } else {
+                            if (currentStatType === 'points') statValue = game.points || 0;
+                            else if (currentStatType === 'goals') statValue = game.goals || 0;
+                            else if (currentStatType === 'assists') statValue = game.assists || 0;
+                            else if (currentStatType === 'shots') statValue = game.shots || 0;
+                        }
                         
                         if (statValue > lineValue) hits++;
                     });
@@ -689,13 +718,31 @@
             }
             
             let html = playersWithHitRates.map(({player, hasOdds}) => {
-                const name = player.skaterFullName || 'Unknown Player';
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown Goalie') : 
+                    (player.skaterFullName || 'Unknown Player');
                 const team = player.teamAbbrevs || 'N/A';
-                const goals = player.goals || 0;
-                const assists = player.assists || 0;
-                const points = player.points || 0;
-                const position = player.positionCode || 'N/A';
                 const gamesPlayed = player.gamesPlayed || 0;
+                
+                let stat1Label, stat1Value, stat2Label, stat2Value, stat3Label, stat3Value;
+                
+                if (isGoalieMode) {
+                    stat1Label = 'Saves';
+                    stat1Value = player.saves || 0;
+                    stat2Label = 'GAA';
+                    stat2Value = (player.goalsAgainstAverage || 0).toFixed(2);
+                    stat3Label = 'SV%';
+                    stat3Value = (player.savePct || 0).toFixed(3);
+                } else {
+                    stat1Label = 'Goals';
+                    stat1Value = player.goals || 0;
+                    stat2Label = 'Assists';
+                    stat2Value = player.assists || 0;
+                    stat3Label = 'Points';
+                    stat3Value = player.points || 0;
+                }
+                
+                const position = isGoalieMode ? 'G' : (player.positionCode || 'N/A');
                 
                 const playerOdds = bettingOdds[name];
                 let oddsDisplay = '';
@@ -722,16 +769,16 @@
                         <div class="player-team">${team} - ${position} | GP: ${gamesPlayed}</div>
                         <div class="player-stats">
                             <div class="stat">
-                                <div class="stat-label">Goals</div>
-                                <div class="stat-value">${goals}</div>
+                                <div class="stat-label">${stat1Label}</div>
+                                <div class="stat-value">${stat1Value}</div>
                             </div>
                             <div class="stat">
-                                <div class="stat-label">Assists</div>
-                                <div class="stat-value">${assists}</div>
+                                <div class="stat-label">${stat2Label}</div>
+                                <div class="stat-value">${stat2Value}</div>
                             </div>
                             <div class="stat">
-                                <div class="stat-label">Points</div>
-                                <div class="stat-value">${points}</div>
+                                <div class="stat-label">${stat3Label}</div>
+                                <div class="stat-value">${stat3Value}</div>
                             </div>
                         </div>
                         <div class="hit-rate-display" id="hitrate-${player.playerId}">
@@ -747,7 +794,9 @@
 
         function updateAllHitRates() {
             filteredPlayers.forEach(player => {
-                const name = player.skaterFullName || 'Unknown Player';
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown Goalie') : 
+                    (player.skaterFullName || 'Unknown Player');
                 const playerOdds = bettingOdds[name];
                 let lineValue = 0.5;
                 
@@ -755,7 +804,8 @@
                     lineValue = playerOdds[currentStatType].line;
                 }
                 
-                const gameLog = allGameLogs[player.playerId];
+                const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
+                const gameLog = gameLogSource[player.playerId];
                 
                 if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
                     const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
@@ -771,10 +821,14 @@
 
                 games.forEach(game => {
                     let statValue = 0;
-                    if (currentStatType === 'points') statValue = game.points || 0;
-                    else if (currentStatType === 'goals') statValue = game.goals || 0;
-                    else if (currentStatType === 'assists') statValue = game.assists || 0;
-                    else if (currentStatType === 'shots') statValue = game.shots || 0;
+                    if (isGoalieMode) {
+                        statValue = game.saveShotsAgainst || game.saves || 0;
+                    } else {
+                        if (currentStatType === 'points') statValue = game.points || 0;
+                        else if (currentStatType === 'goals') statValue = game.goals || 0;
+                        else if (currentStatType === 'assists') statValue = game.assists || 0;
+                        else if (currentStatType === 'shots') statValue = game.shots || 0;
+                    }
                     
                     if (statValue > lineValue) hits++;
                 });
