@@ -1,4 +1,20 @@
-// api/update-data.js - Optimized cron job to fetch and cache NHL data + betting odds
+// Step 3: Only fetch game logs for TOP players WITH betting lines (ultra fast!)
+    console.log('Fetching game logs only for top players with betting lines...');
+    const gameLogsData = {};
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Get player IDs for players with odds
+    const playerNamesWithOdds = Object.keys(bettingOdds);
+    const playersToFetch = playersWithGames.filter(p => 
+      playerNamesWithOdds.includes(p.skaterFullName)
+    );
+
+    console.log(`Need logs for ${playersToFetch.length} players with odds`);
+
+    // ONLY fetch top 100 players by points to stay under time limit
+    const topPlayers = playersToFetch
+      .sort((a, // api/update-data.js - Optimized cron job to fetch and cache NHL data + betting odds
 import { put } from '@vercel/blob';
 
 export default async function handler(req, res) {
@@ -37,52 +53,8 @@ export default async function handler(req, res) {
     const playersWithGames = allPlayers.filter(p => (p.gamesPlayed || 0) > 0);
     console.log(`Found ${playersWithGames.length} active players (${Date.now() - startTime}ms)`);
 
-    // Step 2: Fetch game logs in LARGE parallel batches - OPTIMIZED
-    console.log('Fetching game logs in parallel...');
-    const gameLogsData = {};
-    let successCount = 0;
-    let errorCount = 0;
-
-    // Process ALL players at once with Promise.allSettled for speed
-    const batchSize = 150; // Increased batch size
-    for (let i = 0; i < playersWithGames.length; i += batchSize) {
-      const batch = playersWithGames.slice(i, i + batchSize);
-      
-      const results = await Promise.allSettled(
-        batch.map(async player => {
-          const gameLogUrl = `https://api-web.nhle.com/v1/player/${player.playerId}/game-log/${season}/2`;
-          const response = await fetch(gameLogUrl);
-          if (response.ok) {
-            const gameLog = await response.json();
-            if (gameLog?.gameLog?.length > 0) {
-              return { playerId: player.playerId, gameLog };
-            }
-          }
-          throw new Error('No data');
-        })
-      );
-      
-      results.forEach(result => {
-        if (result.status === 'fulfilled') {
-          gameLogsData[result.value.playerId] = result.value.gameLog;
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      });
-      
-      console.log(`Processed ${i + batch.length}/${playersWithGames.length} players`);
-      
-      // Small delay to avoid rate limiting
-      if (i + batchSize < playersWithGames.length) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-
-    console.log(`Game logs: ${successCount} success, ${errorCount} errors (${Date.now() - startTime}ms)`);
-
-    // Step 3: Fetch betting odds - FAST
-    console.log('Fetching betting odds...');
+    // Step 2: Fetch betting odds FIRST (to know which players matter)
+    console.log('Fetching betting odds first...');
     let bettingOdds = {};
     let oddsError = null;
 
@@ -181,7 +153,7 @@ export default async function handler(req, res) {
           });
         }
 
-        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
+        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players (${Date.now() - startTime}ms)`);
       } else {
         oddsError = 'ODDS_API_KEY not set';
       }
@@ -190,7 +162,55 @@ export default async function handler(req, res) {
       console.error('Odds error:', error);
     }
 
-    console.log(`Odds fetching complete (${Date.now() - startTime}ms)`);
+    // Step 3: Only fetch game logs for players WITH betting lines (much faster!)
+    console.log('Fetching game logs only for players with betting lines...');
+    const gameLogsData = {};
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Get player IDs for players with odds
+    const playerNamesWithOdds = Object.keys(bettingOdds);
+    const playersToFetch = playersWithGames.filter(p => 
+      playerNamesWithOdds.includes(p.skaterFullName)
+    );
+
+    console.log(`Fetching logs for ${playersToFetch.length} players with odds (out of ${playersWithGames.length} total)`);
+
+    // Process in smaller batches since we have fewer players
+    const batchSize = 100;
+    for (let i = 0; i < playersToFetch.length; i += batchSize) {
+      const batch = playersToFetch.slice(i, i + batchSize);
+      
+      const results = await Promise.allSettled(
+        batch.map(async player => {
+          const gameLogUrl = `https://api-web.nhle.com/v1/player/${player.playerId}/game-log/${season}/2`;
+          const response = await fetch(gameLogUrl);
+          if (response.ok) {
+            const gameLog = await response.json();
+            if (gameLog?.gameLog?.length > 0) {
+              return { playerId: player.playerId, gameLog };
+            }
+          }
+          throw new Error('No data');
+        })
+      );
+      
+      results.forEach(result => {
+        if (result.status === 'fulfilled') {
+          gameLogsData[result.value.playerId] = result.value.gameLog;
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      });
+      
+      // Small delay
+      if (i + batchSize < playersToFetch.length) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
+    console.log(`Game logs: ${successCount} success, ${errorCount} errors (${Date.now() - startTime}ms)`);
 
     // Step 4: Save to Vercel Blob
     const cacheData = {
