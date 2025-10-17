@@ -596,6 +596,7 @@
                 allGameLogs = data.gameLogs || {};
                 allGoalieGameLogs = data.goalieGameLogs || {};
                 bettingOdds = data.bettingOdds || {};
+                teamShotData = data.teamShotData || [];
                 
                 allPlayersData = allPlayersData.filter(p => (p.gamesPlayed || 0) > 0);
                 allGoaliesData = allGoaliesData.filter(g => (g.gamesPlayed || 0) > 0);
@@ -604,7 +605,8 @@
                 const statusDiv = document.getElementById('apiStatus');
                 const bettingLinesCount = data.stats?.bettingLinesLoaded || 0;
                 const goalieCount = allGoaliesData.length;
-                statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${goalieCount} goalies | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
+                const teamCount = teamShotData.length;
+                statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${goalieCount} goalies | ${teamCount} teams | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
                 statusDiv.style.background = 'var(--success-bg)';
                 statusDiv.style.color = 'var(--success-text)';
                 
@@ -737,7 +739,16 @@
                 let gamesPlayed = 0;
                 
                 if (gameLog && gameLog.gameLog && gameLog.gameLog.length > 0) {
-                    const games = gameLog.gameLog.slice(0, 10);
+                    // Filter games - for goalies, only include games where they actually played
+                    let games = gameLog.gameLog;
+                    if (isGoalieMode) {
+                        games = games.filter(game => {
+                            const saves = game.saveShotsAgainst || game.saves || 0;
+                            const shotsAgainst = game.shotsAgainst || 0;
+                            return saves > 0 || shotsAgainst > 0;
+                        });
+                    }
+                    games = games.slice(0, 10);
                     gamesPlayed = games.length;
                     let hits = 0;
                     
@@ -881,7 +892,16 @@
                     return;
                 }
 
-                const games = gameLog.gameLog.slice(0, 10);
+                // Filter games - for goalies, only include games where they actually played
+                let games = gameLog.gameLog;
+                if (isGoalieMode) {
+                    games = games.filter(game => {
+                        const saves = game.saveShotsAgainst || game.saves || 0;
+                        const shotsAgainst = game.shotsAgainst || 0;
+                        return saves > 0 || shotsAgainst > 0;
+                    });
+                }
+                games = games.slice(0, 10);
                 let hits = 0;
 
                 games.forEach(game => {
@@ -997,7 +1017,17 @@
                 console.log('Next opponent detected:', nextOpponent);
             }
 
-            const games = gameLog.gameLog.slice(0, 10);
+            // Filter games - for goalies, only include games where they actually played
+            let games = gameLog.gameLog;
+            if (isGoalieMode) {
+                games = games.filter(game => {
+                    const saves = game.saveShotsAgainst || game.saves || 0;
+                    const shotsAgainst = game.shotsAgainst || 0;
+                    // Only include if they faced shots or made saves
+                    return saves > 0 || shotsAgainst > 0;
+                });
+            }
+            games = games.slice(0, 10);
             let hits = 0;
 
             const gameRows = games.map(game => {
@@ -1020,16 +1050,49 @@
                 const gameDate = new Date(game.gameDate).toLocaleDateString();
 
                 if (isGoalieMode) {
-                    // Goalie-specific row
+                    // Get opponent shot ranking
+                    const teamFullNames = {
+                        'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
+                        'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
+                        'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
+                        'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
+                        'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
+                        'CAR': 'Carolina Hurricanes', 'NSH': 'Nashville Predators', 'WPG': 'Winnipeg Jets',
+                        'MIN': 'Minnesota Wild', 'COL': 'Colorado Avalanche', 'DAL': 'Dallas Stars',
+                        'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
+                        'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
+                        'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
+                        'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
+                    };
+                    
+                    const oppTeamName = teamFullNames[opponent];
+                    const oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                    
+                    let shotRankBadge = '';
+                    if (oppTeamData) {
+                        // Color code: 1-10 = red (high shots), 11-22 = orange (medium), 23-32 = green (low shots)
+                        let badgeColor = '#27ae60'; // green
+                        if (oppTeamData.rank <= 10) {
+                            badgeColor = '#e74c3c'; // red
+                        } else if (oppTeamData.rank <= 22) {
+                            badgeColor = '#f39c12'; // orange
+                        }
+                        shotRankBadge = `<span style="background: ${badgeColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin-left: 5px;">#${oppTeamData.rank}</span>`;
+                    }
+                    
+                    const saves = game.saveShotsAgainst || game.saves || 0;
+                    const shotsAgainst = game.shotsAgainst || saves + (game.goalsAgainst || 0);
+                    const savePct = shotsAgainst > 0 ? ((saves / shotsAgainst) * 100).toFixed(1) + '%' : 'N/A';
+                    
                     return `
                         <tr class="${hit ? 'hit' : 'miss'}">
                             <td>${gameDate}</td>
-                            <td>${homeAway} ${opponent}</td>
-                            <td>${game.saveShotsAgainst || game.saves || 0}</td>
+                            <td>${homeAway} ${opponent} ${shotRankBadge}</td>
+                            <td>${saves}</td>
+                            <td>${shotsAgainst}</td>
                             <td>${game.goalsAgainst || 0}</td>
-                            <td>${game.savePct ? (game.savePct * 100).toFixed(1) + '%' : 'N/A'}</td>
+                            <td>${savePct}</td>
                             <td>${game.decision || 'N/A'}</td>
-                            <td><strong>${statValue}</strong></td>
                         </tr>
                     `;
                 } else {
@@ -1157,6 +1220,26 @@
                         <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${playerOdds[currentStatType].game}</div>
                         <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
                         <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
+                        ${isGoalieMode && nextOpponent ? (() => {
+                            const teamMappings = {
+                                'Toronto Maple Leafs': 'TOR', 'Boston Bruins': 'BOS', 'Tampa Bay Lightning': 'TBL',
+                                'Florida Panthers': 'FLA', 'Montreal Canadiens': 'MTL', 'Ottawa Senators': 'OTT',
+                                'Buffalo Sabres': 'BUF', 'Detroit Red Wings': 'DET', 'New York Rangers': 'NYR',
+                                'New York Islanders': 'NYI', 'New Jersey Devils': 'NJD', 'Pittsburgh Penguins': 'PIT',
+                                'Washington Capitals': 'WSH', 'Philadelphia Flyers': 'PHI', 'Columbus Blue Jackets': 'CBJ',
+                                'Carolina Hurricanes': 'CAR', 'Nashville Predators': 'NSH', 'Winnipeg Jets': 'WPG',
+                                'Minnesota Wild': 'MIN', 'Colorado Avalanche': 'COL', 'Dallas Stars': 'DAL',
+                                'Chicago Blackhawks': 'CHI', 'St. Louis Blues': 'STL', 'Vegas Golden Knights': 'VGK',
+                                'Edmonton Oilers': 'EDM', 'Calgary Flames': 'CGY', 'Vancouver Canucks': 'VAN',
+                                'Seattle Kraken': 'SEA', 'San Jose Sharks': 'SJS', 'Anaheim Ducks': 'ANA',
+                                'Los Angeles Kings': 'LAK', 'Arizona Coyotes': 'ARI', 'Utah Hockey Club': 'UTA'
+                            };
+                            const oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
+                            if (oppTeamData) {
+                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 Opponent Shot Volume: #${oppTeamData.rank} (${oppTeamData.shotsPerGame.toFixed(1)} shots/game)</div>`;
+                            }
+                            return '';
+                        })() : ''}
                     </div>
                 ` : ''}
                 
@@ -1170,10 +1253,10 @@
                             <th>Opponent</th>
                             ${isGoalieMode ? `
                                 <th>Saves</th>
+                                <th>Shots Against</th>
                                 <th>GA</th>
                                 <th>SV%</th>
                                 <th>Decision</th>
-                                <th>Saves</th>
                             ` : `
                                 <th>Goals</th>
                                 <th>Assists</th>
@@ -1187,6 +1270,12 @@
                         ${gameRows}
                     </tbody>
                 </table>
+                ${isGoalieMode ? `
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
+                        💡 Rankings shown next to opponents indicate their shot volume rank (1 = most shots/game, 32 = fewest)<br>
+                        🔴 Red = High volume (1-10) | 🟠 Orange = Medium volume (11-22) | 🟢 Green = Low volume (23-32)
+                    </div>
+                ` : ''}
             `;
 
             document.getElementById('gameLogModal').style.display = 'block';
