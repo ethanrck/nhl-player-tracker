@@ -84,6 +84,54 @@ export default async function handler(req, res) {
     console.log(`Loaded stats for ${teamShotData.length} teams (${Date.now() - startTime}ms)`);
 
     // Step 2: Fetch betting odds FIRST (to know which players matter)
+
+    // Step 1b: Fetch ALL goalie stats (paginated)
+    console.log('Fetching all goalie stats...');
+    let allGoalies = [];
+    start = 0;
+    hasMore = true;
+
+    while (hasMore) {
+      const goalieUrl = `https://api.nhle.com/stats/rest/en/goalie/summary?limit=${limit}&start=${start}&cayenneExp=seasonId=${season}`;
+      const goalieResponse = await fetch(goalieUrl);
+      const goalieData = await goalieResponse.json();
+      const goalies = goalieData.data || [];
+
+      if (goalies.length === 0) {
+        hasMore = false;
+      } else {
+        allGoalies = allGoalies.concat(goalies);
+        start += limit;
+        if (goalies.length < limit) hasMore = false;
+      }
+    }
+
+    const goaliesWithGames = allGoalies.filter(g => (g.gamesPlayed || 0) > 0);
+    console.log(`Found ${goaliesWithGames.length} active goalies (${Date.now() - startTime}ms)`);
+
+    // Step 1c: Fetch team stats for shot volume rankings
+    console.log('Fetching team stats...');
+    const teamStatsUrl = `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=${season}`;
+    const teamStatsResponse = await fetch(teamStatsUrl);
+    const teamStatsData = await teamStatsResponse.json();
+    const teamStats = teamStatsData.data || [];
+
+    // Calculate shots per game and rank teams
+    const teamShotData = teamStats.map(team => ({
+      abbrev: team.teamCommonName || team.teamFullName,
+      teamFullName: team.teamFullName,
+      shotsPerGame: (team.shotsForPerGame || 0),
+      gamesPlayed: team.gamesPlayed || 0
+    })).sort((a, b) => b.shotsPerGame - a.shotsPerGame);
+
+    // Add rank (1 = most shots)
+    teamShotData.forEach((team, index) => {
+      team.rank = index + 1;
+    });
+
+    console.log(`Loaded stats for ${teamShotData.length} teams (${Date.now() - startTime}ms)`);
+
+    // Step 2: Fetch betting odds FIRST (to know which players matter)
     console.log('Fetching betting odds first...');
     let bettingOdds = {};
     let oddsError = null;
