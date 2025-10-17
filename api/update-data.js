@@ -1,5 +1,6 @@
-// api/update-data.js - Cron job to fetch and cache NHL data + betting odds daily
+// api/update-data.js - Cron job to fetch and cache NHL data + betting odds + dynamic scheduling
 import { put } from '@vercel/blob';
+import { Client } from '@upstash/qstash';
 
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization;
@@ -87,6 +88,7 @@ export default async function handler(req, res) {
     console.log('Fetching betting odds...');
     let bettingOdds = {};
     let oddsError = null;
+    let nextGameTime = null;
 
     try {
       const oddsApiKey = process.env.ODDS_API_KEY;
@@ -110,6 +112,35 @@ export default async function handler(req, res) {
         });
 
         console.log(`Found ${upcomingGames.length} upcoming games`);
+
+        // Find the first game of TODAY
+        if (upcomingGames.length > 0) {
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const todayEnd = new Date(todayStart.getTime() + (24 * 60 * 60 * 1000));
+          
+          // Filter for games happening today
+          const todaysGames = upcomingGames.filter(e => {
+            const gameTime = new Date(e.commence_time);
+            return gameTime >= todayStart && gameTime < todayEnd;
+          });
+          
+          if (todaysGames.length > 0) {
+            // Sort by time and get the earliest game today
+            const sortedTodaysGames = todaysGames.sort((a, b) => 
+              new Date(a.commence_time) - new Date(b.commence_time)
+            );
+            nextGameTime = sortedTodaysGames[0].commence_time;
+            console.log(`First game today: ${new Date(nextGameTime).toLocaleString()} (${todaysGames.length} total games today)`);
+          } else {
+            // No games today, find first game tomorrow or later
+            const sortedGames = upcomingGames.sort((a, b) => 
+              new Date(a.commence_time) - new Date(b.commence_time)
+            );
+            nextGameTime = sortedGames[0].commence_time;
+            console.log(`No games today. Next game: ${new Date(nextGameTime).toLocaleString()}`);
+          }
+        }
 
         // Fetch all props in parallel
         const gamePromises = upcomingGames.map(async event => {
@@ -283,9 +314,55 @@ export default async function handler(req, res) {
 
     console.log(`Goalie game logs: ${goalieSuccessCount} success, ${goalieErrorCount} errors (${Date.now() - startTime}ms)`);
 
-    // Step 7: Save to Vercel Blob
+    // Step 7: Schedule dynamic pre-game update with QStash
+    if (nextGameTime && process.env.QSTASH_TOKEN) {
+      try {
+        const qstash = new Client({
+          token: process.env.QSTASH_TOKEN,
+        });
+        
+        const gameTime = new Date(nextGameTime);
+        const oneHourBefore = new Date(gameTime.getTime() - (60 * 60 * 1000));
+        const now = new Date();
+        
+        // Only schedule if the game is more than 1 hour away
+        if (oneHourBefore > now) {
+          // Cancel any existing scheduled jobs first (to avoid duplicates)
+          try {
+            const schedules = await qstash.schedules.list();
+            for (const schedule of schedules) {
+              if (schedule.destination?.includes('/api/update-data')) {
+                await qstash.schedules.delete(schedule.scheduleId);
+                console.log(`Cancelled existing schedule: ${schedule.scheduleId}`);
+              }
+            }
+          } catch (e) {
+            console.log('No existing schedules to cancel');
+          }
+          
+          // Schedule new update
+          const scheduleId = await qstash.schedules.create({
+            destination: `https://nhl-player-tracker.vercel.app/api/update-data`,
+            cron: `${oneHourBefore.getUTCMinutes()} ${oneHourBefore.getUTCHours()} ${oneHourBefore.getUTCDate()} ${oneHourBefore.getUTCMonth() + 1} *`,
+            headers: {
+              "Authorization": `Bearer ${process.env.CRON_SECRET}`
+            }
+          });
+          
+          console.log(`✅ Scheduled pre-game update for ${oneHourBefore.toLocaleString()} (Schedule ID: ${scheduleId})`);
+        } else {
+          console.log('Next game is less than 1 hour away, skipping schedule');
+        }
+      } catch (qstashError) {
+        console.error('QStash scheduling error:', qstashError);
+        // Don't fail the whole update if scheduling fails
+      }
+    }
+
+    // Step 8: Save to Vercel Blob
     const cacheData = {
       lastUpdated: new Date().toISOString(),
+      nextGameTime,
       season,
       allPlayers: playersWithGames,
       allGoalies: goaliesWithGames,
@@ -316,6 +393,7 @@ export default async function handler(req, res) {
       success: true,
       message: 'NHL data updated successfully',
       lastUpdated: cacheData.lastUpdated,
+      nextGameTime: nextGameTime ? new Date(nextGameTime).toLocaleString() : 'No games found',
       executionTime: `${totalTime}ms`,
       stats: cacheData.stats,
       blobUrl: blob.url
