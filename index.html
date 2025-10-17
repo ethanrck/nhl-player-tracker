@@ -623,28 +623,24 @@
             
             document.querySelectorAll('.stat-button').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent.toLowerCase().includes(stat)) {
+            });
+            
+            // Manually activate the correct button
+            const buttons = document.querySelectorAll('.stat-button');
+            buttons.forEach(btn => {
+                const btnText = btn.textContent.toLowerCase();
+                if ((stat === 'saves' && btnText.includes('goalie')) ||
+                    (stat === 'points' && btnText === 'points') ||
+                    (stat === 'goals' && btnText === 'goals') ||
+                    (stat === 'assists' && btnText === 'assists') ||
+                    (stat === 'shots' && btnText === 'shots')) {
                     btn.classList.add('active');
                 }
             });
             
             // Switch between skaters and goalies
             if (isGoalieMode) {
-                if (allGoaliesData.length === 0) {
-                    alert('Goalie data not available yet. Please update the backend and run the data refresh.');
-                    // Switch back to points
-                    currentStatType = 'points';
-                    isGoalieMode = false;
-                    document.querySelectorAll('.stat-button').forEach(btn => {
-                        btn.classList.remove('active');
-                        if (btn.textContent.toLowerCase() === 'points') {
-                            btn.classList.add('active');
-                        }
-                    });
-                    filteredPlayers = [...allPlayersData];
-                } else {
-                    filteredPlayers = [...allGoaliesData];
-                }
+                filteredPlayers = [...allGoaliesData];
             } else {
                 filteredPlayers = [...allPlayersData];
             }
