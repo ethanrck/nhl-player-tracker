@@ -36,7 +36,31 @@ export default async function handler(req, res) {
     const playersWithGames = allPlayers.filter(p => (p.gamesPlayed || 0) > 0);
     console.log(`Found ${playersWithGames.length} active players`);
 
-    // Step 2: Fetch game logs
+    // Step 1b: Fetch ALL goalie stats (paginated)
+    console.log('Fetching all goalie stats...');
+    let allGoalies = [];
+    start = 0;
+    hasMore = true;
+
+    while (hasMore) {
+      const goalieUrl = `https://api.nhle.com/stats/rest/en/goalie/summary?limit=${limit}&start=${start}&cayenneExp=seasonId=${season}`;
+      const goalieResponse = await fetch(goalieUrl);
+      const goalieData = await goalieResponse.json();
+      const goalies = goalieData.data || [];
+
+      if (goalies.length === 0) {
+        hasMore = false;
+      } else {
+        allGoalies = allGoalies.concat(goalies);
+        start += limit;
+        if (goalies.length < limit) hasMore = false;
+      }
+    }
+
+    const goaliesWithGames = allGoalies.filter(g => (g.gamesPlayed || 0) > 0);
+    console.log(`Found ${goaliesWithGames.length} active goalies`);
+
+    // Step 2: Fetch player game logs
     const gameLogsData = {};
     let successCount = 0;
     let errorCount = 0;
@@ -63,6 +87,37 @@ export default async function handler(req, res) {
       );
       if (i + batchSize < playersWithGames.length) await new Promise(r => setTimeout(r, 500));
     }
+
+    console.log(`Player game logs: ${successCount} success, ${errorCount} errors`);
+
+    // Step 2b: Fetch goalie game logs
+    const goalieGameLogsData = {};
+    let goalieSuccessCount = 0;
+    let goalieErrorCount = 0;
+
+    for (let i = 0; i < goaliesWithGames.length; i += batchSize) {
+      const batch = goaliesWithGames.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async goalie => {
+          try {
+            const gameLogUrl = `https://api-web.nhle.com/v1/player/${goalie.playerId}/game-log/${season}/2`;
+            const gameLogResponse = await fetch(gameLogUrl);
+            if (gameLogResponse.ok) {
+              const gameLog = await gameLogResponse.json();
+              if (gameLog?.gameLog?.length > 0) {
+                goalieGameLogsData[goalie.playerId] = gameLog;
+                goalieSuccessCount++;
+              } else goalieErrorCount++;
+            } else goalieErrorCount++;
+          } catch (e) {
+            goalieErrorCount++;
+          }
+        })
+      );
+      if (i + batchSize < goaliesWithGames.length) await new Promise(r => setTimeout(r, 500));
+    }
+
+    console.log(`Goalie game logs: ${goalieSuccessCount} success, ${goalieErrorCount} errors`);
 
     // Step 3: Fetch betting odds
     console.log('Fetching betting odds from The Odds API...');
@@ -93,7 +148,7 @@ export default async function handler(req, res) {
 
         const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
-          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal&oddsFormat=american`;
+          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,goalie_saves&oddsFormat=american`;
           const propsResponse = await fetch(propsUrl);
           if (!propsResponse.ok) return null;
           return { event, data: await propsResponse.json() };
@@ -139,6 +194,14 @@ export default async function handler(req, res) {
                     game: `${event.home_team} vs ${event.away_team}`,
                     gameTime: event.commence_time
                   };
+                } else if (market.key === 'goalie_saves' && !bettingOdds[playerName].saves) {
+                  bettingOdds[playerName].saves = {
+                    line: outcome.point,
+                    odds: outcome.price,
+                    bookmaker: bookmaker.title,
+                    game: `${event.home_team} vs ${event.away_team}`,
+                    gameTime: event.commence_time
+                  };
                 }
               } else if (market.key === 'player_goal_scorer_anytime' && outcome.name === 'Yes') {
                 // Store anytime goal scorer as goals with 0.5 line
@@ -171,12 +234,16 @@ export default async function handler(req, res) {
       lastUpdated: new Date().toISOString(),
       season,
       allPlayers: playersWithGames,
+      allGoalies: goaliesWithGames,
       gameLogs: gameLogsData,
+      goalieGameLogs: goalieGameLogsData,
       bettingOdds,
       stats: {
         totalPlayers: playersWithGames.length,
+        totalGoalies: goaliesWithGames.length,
         gameLogsLoaded: successCount,
-        errors: errorCount,
+        goalieLogsLoaded: goalieSuccessCount,
+        errors: errorCount + goalieErrorCount,
         bettingLinesLoaded: Object.keys(bettingOdds).length,
         oddsError
       }
