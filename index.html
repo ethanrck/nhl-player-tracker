@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PuckProphet - NHL Player Line Tracker</title>
-    <style>
+    <link rel="icon" href="/favicon.png" type="image/png">    <style>
         * {
             margin: 0;
             padding: 0;
@@ -580,7 +580,8 @@
                 statusDiv.style.background = 'var(--success-bg)';
                 statusDiv.style.color = 'var(--success-text)';
                 
-                displayPlayers();
+                // Apply initial filter based on checkbox state
+                filterPlayers();
 
             } catch (error) {
                 container.innerHTML = `<div class="error"><strong>Error loading cached data:</strong> ${error.message}</div>`;
