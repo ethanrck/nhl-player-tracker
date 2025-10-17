@@ -11,43 +11,122 @@
             box-sizing: border-box;
         }
         
+        :root {
+            --bg-gradient-start: #1e3c72;
+            --bg-gradient-end: #2a5298;
+            --container-bg: white;
+            --text-primary: #1e3c72;
+            --text-secondary: #666;
+            --card-bg: #f8f9fa;
+            --card-hover-border: #2a5298;
+            --button-bg: white;
+            --button-text: #2a5298;
+            --button-active-bg: #2a5298;
+            --button-active-text: white;
+            --modal-overlay: rgba(0,0,0,0.7);
+            --table-header-bg: #2a5298;
+            --table-border: #ddd;
+            --input-border: #ddd;
+            --warning-bg: #fff3cd;
+            --warning-text: #856404;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+            --hit-bg: #d4edda;
+            --miss-bg: #f8d7da;
+        }
+        
+        body.dark-mode {
+            --bg-gradient-start: #0a1929;
+            --bg-gradient-end: #1a2332;
+            --container-bg: #1e2936;
+            --text-primary: #e3f2fd;
+            --text-secondary: #b0bec5;
+            --card-bg: #263238;
+            --card-hover-border: #4fc3f7;
+            --button-bg: #263238;
+            --button-text: #4fc3f7;
+            --button-active-bg: #4fc3f7;
+            --button-active-text: #0a1929;
+            --modal-overlay: rgba(0,0,0,0.85);
+            --table-header-bg: #1565c0;
+            --table-border: #37474f;
+            --input-border: #37474f;
+            --warning-bg: #3e2723;
+            --warning-text: #ffb74d;
+            --success-bg: #1b5e20;
+            --success-text: #81c784;
+            --error-bg: #b71c1c;
+            --error-text: #ef5350;
+            --hit-bg: #2e7d32;
+            --miss-bg: #c62828;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             min-height: 100vh;
             padding: 20px;
+            transition: all 0.3s ease;
         }
         
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: white;
+            background: var(--container-bg);
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
         
         h1 {
-            color: #1e3c72;
-            text-align: center;
-            margin-bottom: 10px;
+            color: var(--text-primary);
             font-size: 2.5em;
+            transition: color 0.3s ease;
+        }
+        
+        .dark-mode-toggle {
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 2px solid var(--button-text);
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .dark-mode-toggle:hover {
+            background: var(--button-active-bg);
+            color: var(--button-active-text);
         }
         
         .subtitle {
             text-align: center;
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 20px;
+            transition: color 0.3s ease;
         }
         
         .api-status {
-            background: #fff3cd;
-            color: #856404;
+            background: var(--warning-bg);
+            color: var(--warning-text);
             padding: 10px;
             border-radius: 8px;
             margin-bottom: 20px;
             text-align: center;
             font-size: 14px;
+            transition: all 0.3s ease;
         }
         
         .controls {
@@ -56,9 +135,10 @@
             margin-bottom: 30px;
             flex-wrap: wrap;
             align-items: center;
-            background: #f8f9fa;
+            background: var(--card-bg);
             padding: 20px;
             border-radius: 10px;
+            transition: all 0.3s ease;
         }
         
         .control-group {
@@ -69,14 +149,18 @@
         
         label {
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
+            transition: color 0.3s ease;
         }
         
         input[type="text"], input[type="checkbox"] {
             padding: 10px;
             font-size: 16px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
+            background: var(--container-bg);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         
         input[type="checkbox"] {
@@ -93,9 +177,9 @@
         
         .stat-button {
             padding: 12px 24px;
-            background: white;
-            color: #2a5298;
-            border: 2px solid #2a5298;
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 2px solid var(--button-text);
             border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
@@ -104,12 +188,12 @@
         }
         
         .stat-button:hover {
-            background: #f0f0f0;
+            opacity: 0.8;
         }
         
         .stat-button.active {
-            background: #2a5298;
-            color: white;
+            background: var(--button-active-bg);
+            color: var(--button-active-text);
         }
         
         .search-box {
@@ -125,7 +209,7 @@
         }
         
         .player-card {
-            background: #f8f9fa;
+            background: var(--card-bg);
             border-radius: 10px;
             padding: 20px;
             cursor: pointer;
@@ -136,7 +220,7 @@
         .player-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            border-color: #2a5298;
+            border-color: var(--card-hover-border);
         }
         
         .player-header {
@@ -149,15 +233,16 @@
         .player-name {
             font-size: 1.2em;
             font-weight: bold;
-            color: #1e3c72;
+            color: var(--text-primary);
             flex: 1;
+            transition: color 0.3s ease;
         }
         
         .odds-line {
             font-size: 0.9em;
             font-weight: 600;
             color: #e67e22;
-            background: #fff3cd;
+            background: var(--warning-bg);
             padding: 4px 8px;
             border-radius: 4px;
             white-space: nowrap;
@@ -165,9 +250,10 @@
         }
         
         .player-team {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 0.9em;
             margin-bottom: 10px;
+            transition: color 0.3s ease;
         }
         
         .player-stats {
@@ -183,21 +269,24 @@
         
         .stat-label {
             font-size: 0.8em;
-            color: #666;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
         }
         
         .stat-value {
             font-size: 1.3em;
             font-weight: bold;
-            color: #1e3c72;
+            color: var(--text-primary);
+            transition: color 0.3s ease;
         }
         
         .hit-rate-display {
             margin-top: 10px;
             padding: 10px;
-            background: white;
+            background: var(--container-bg);
             border-radius: 5px;
             text-align: center;
+            transition: all 0.3s ease;
         }
         
         .hit-rate-value {
@@ -224,16 +313,18 @@
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: var(--text-secondary);
             font-size: 18px;
+            transition: color 0.3s ease;
         }
         
         .error {
-            background: #f8d7da;
-            color: #721c24;
+            background: var(--error-bg);
+            color: var(--error-text);
             padding: 15px;
             border-radius: 8px;
             margin-top: 20px;
+            transition: all 0.3s ease;
         }
         
         .game-log-modal {
@@ -243,19 +334,21 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: var(--modal-overlay);
             z-index: 1000;
             overflow-y: auto;
             padding: 20px;
+            transition: all 0.3s ease;
         }
         
         .modal-content {
-            background: white;
+            background: var(--container-bg);
             max-width: 1000px;
             margin: 20px auto;
             border-radius: 15px;
             padding: 30px;
             position: relative;
+            transition: all 0.3s ease;
         }
         
         .close-modal {
@@ -264,11 +357,12 @@
             right: 20px;
             font-size: 30px;
             cursor: pointer;
-            color: #666;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
         }
         
         .close-modal:hover {
-            color: #000;
+            color: var(--text-primary);
         }
         
         table {
@@ -278,7 +372,7 @@
         }
         
         th {
-            background: #2a5298;
+            background: var(--table-header-bg);
             color: white;
             padding: 12px;
             text-align: left;
@@ -286,19 +380,21 @@
         
         td {
             padding: 12px;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid var(--table-border);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         
         tr:hover {
-            background: #f9f9f9;
+            background: var(--card-bg);
         }
         
         .hit {
-            background-color: #d4edda !important;
+            background-color: var(--hit-bg) !important;
         }
         
         .miss {
-            background-color: #f8d7da !important;
+            background-color: var(--miss-bg) !important;
         }
         
         .summary-stats {
@@ -309,32 +405,89 @@
         }
         
         .summary-card {
-            background: #f8f9fa;
+            background: var(--card-bg);
             padding: 15px;
             border-radius: 8px;
             text-align: center;
+            transition: all 0.3s ease;
         }
         
         .summary-label {
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 5px;
+            transition: color 0.3s ease;
         }
         
         .summary-value {
             font-size: 1.8em;
             font-weight: bold;
-            color: #1e3c72;
+            color: var(--text-primary);
+            transition: color 0.3s ease;
+        }
+        
+        .h2h-section {
+            background: var(--warning-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .h2h-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--warning-text);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .h2h-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        
+        .h2h-stat {
+            text-align: center;
+            padding: 10px;
+            background: var(--container-bg);
+            border-radius: 5px;
+        }
+        
+        .h2h-stat-label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 3px;
+        }
+        
+        .h2h-stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+        
+        h2, h3 {
+            color: var(--text-primary);
+            transition: color 0.3s ease;
+        }
+        
+        p {
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏒 PuckProphet</h1>
+        <div class="header-row">
+            <h1>🏒 PuckProphet</h1>
+            <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+        </div>
         <p class="subtitle">NHL Player Line Tracker - 2025-2026 Season</p>
         
         <div class="api-status" id="apiStatus">
-            📄 Loading cached data...
+            📊 Loading cached data...
         </div>
         
         <div class="controls">
@@ -349,8 +502,8 @@
             </div>
         </div>
         
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #333;">Select Stat:</label>
+        <div style="background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; transition: all 0.3s ease;">
+            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: var(--text-primary);">Select Stat:</label>
             <div class="stat-buttons">
                 <button class="stat-button active" onclick="selectStat('points')">Points</button>
                 <button class="stat-button" onclick="selectStat('goals')">Goals</button>
@@ -381,7 +534,23 @@
         let bettingOdds = {};
         let currentStatType = 'points';
 
+        // Dark mode toggle
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            
+            const btn = document.querySelector('.dark-mode-toggle');
+            btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        }
+
+        // Load dark mode preference
         window.onload = function() {
+            const darkMode = localStorage.getItem('darkMode') === 'true';
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                document.querySelector('.dark-mode-toggle').textContent = '☀️ Light Mode';
+            }
             loadCachedData();
         };
 
@@ -408,8 +577,8 @@
                 const statusDiv = document.getElementById('apiStatus');
                 const bettingLinesCount = data.stats?.bettingLinesLoaded || 0;
                 statusDiv.innerHTML = `✅ Loaded ${allPlayersData.length} players | ${data.stats.gameLogsLoaded} game logs | ${bettingLinesCount} betting lines | Last updated: ${new Date(data.lastUpdated).toLocaleString()}`;
-                statusDiv.style.background = '#d4edda';
-                statusDiv.style.color = '#155724';
+                statusDiv.style.background = 'var(--success-bg)';
+                statusDiv.style.color = 'var(--success-text)';
                 
                 displayPlayers();
 
@@ -623,6 +792,35 @@
             });
         }
 
+        function calculateH2HStats(games, opponent) {
+            const h2hGames = games.filter(game => game.opponentAbbrev === opponent);
+            
+            if (h2hGames.length === 0) return null;
+            
+            let totalGoals = 0;
+            let totalAssists = 0;
+            let totalPoints = 0;
+            let totalShots = 0;
+            
+            h2hGames.forEach(game => {
+                totalGoals += game.goals || 0;
+                totalAssists += game.assists || 0;
+                totalPoints += game.points || 0;
+                totalShots += game.shots || 0;
+            });
+            
+            return {
+                games: h2hGames.length,
+                avgGoals: (totalGoals / h2hGames.length).toFixed(2),
+                avgAssists: (totalAssists / h2hGames.length).toFixed(2),
+                avgPoints: (totalPoints / h2hGames.length).toFixed(2),
+                avgShots: (totalShots / h2hGames.length).toFixed(2),
+                totalGoals,
+                totalAssists,
+                totalPoints
+            };
+        }
+
         function showGameLog(playerId) {
             const gameLog = allGameLogs[playerId];
             
@@ -636,8 +834,21 @@
             
             const playerOdds = bettingOdds[name];
             let lineValue = 0.5;
+            let nextOpponent = null;
+            
             if (playerOdds && playerOdds[currentStatType]) {
                 lineValue = playerOdds[currentStatType].line;
+                // Extract opponent from game string (e.g., "Toronto Maple Leafs vs Boston Bruins")
+                const gameStr = playerOdds[currentStatType].game;
+                const teams = gameStr.split(' vs ');
+                const playerTeam = player.teamAbbrevs;
+                
+                // Determine which team is the opponent
+                if (teams[0].includes(playerTeam) || teams[0].toLowerCase().includes(playerTeam.toLowerCase())) {
+                    nextOpponent = teams[1];
+                } else {
+                    nextOpponent = teams[0];
+                }
             }
 
             const games = gameLog.gameLog.slice(0, 10);
@@ -672,6 +883,51 @@
 
             const hitRate = ((hits / games.length) * 100).toFixed(1);
             const colorClass = getHitRateColor(parseFloat(hitRate));
+            
+            // Calculate H2H stats if we have a next opponent
+            let h2hSection = '';
+            if (nextOpponent) {
+                // Try to match opponent abbreviation from full name
+                const allGames = gameLog.gameLog;
+                const h2hStats = calculateH2HStats(allGames, null, nextOpponent);
+                
+                if (h2hStats && h2hStats.games > 0) {
+                    const h2hHitRate = calculateH2HHitRate(allGames, nextOpponent, lineValue);
+                    const h2hColorClass = getHitRateColor(h2hHitRate);
+                    
+                    h2hSection = `
+                        <div class="h2h-section">
+                            <div class="h2h-title">📊 Head-to-Head vs ${h2hStats.opponentName || nextOpponent}</div>
+                            <div class="h2h-stats">
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Games</div>
+                                    <div class="h2h-stat-value">${h2hStats.games}</div>
+                                </div>
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Avg Goals</div>
+                                    <div class="h2h-stat-value">${h2hStats.avgGoals}</div>
+                                </div>
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Avg Assists</div>
+                                    <div class="h2h-stat-value">${h2hStats.avgAssists}</div>
+                                </div>
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Avg Points</div>
+                                    <div class="h2h-stat-value">${h2hStats.avgPoints}</div>
+                                </div>
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Avg Shots</div>
+                                    <div class="h2h-stat-value">${h2hStats.avgShots}</div>
+                                </div>
+                                <div class="h2h-stat">
+                                    <div class="h2h-stat-label">Hit Rate vs Line</div>
+                                    <div class="h2h-stat-value ${h2hColorClass}">${h2hHitRate.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
             
             let oddsCard = '';
             if (playerOdds && playerOdds[currentStatType]) {
@@ -716,13 +972,15 @@
                 </div>
                 
                 ${playerOdds && playerOdds[currentStatType] ? `
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
-                        <div style="font-size: 0.9em; color: #856404; margin-bottom: 5px; font-weight: 600;">📅 This Game</div>
-                        <div style="font-size: 1.2em; font-weight: bold; color: #1e3c72;">${playerOdds[currentStatType].game}</div>
-                        <div style="font-size: 0.85em; color: #666; margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
-                        <div style="font-size: 0.85em; color: #666; margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
+                    <div style="background: var(--warning-bg); padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; transition: all 0.3s ease;">
+                        <div style="font-size: 0.9em; color: var(--warning-text); margin-bottom: 5px; font-weight: 600;">📅 This Game</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${playerOdds[currentStatType].game}</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                        <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
                     </div>
                 ` : ''}
+                
+                ${h2hSection}
 
                 <h3>Last ${games.length} Games</h3>
                 <table>
@@ -744,6 +1002,131 @@
             `;
 
             document.getElementById('gameLogModal').style.display = 'block';
+        }
+
+        function calculateH2HStats(allGames, opponentAbbrev, opponentFullName) {
+            // Try to find games against this opponent
+            let h2hGames = [];
+            let matchedOpponent = '';
+            
+            // Team name mappings for matching
+            const teamMappings = {
+                'Maple Leafs': 'TOR',
+                'Bruins': 'BOS',
+                'Lightning': 'TBL',
+                'Panthers': 'FLA',
+                'Canadiens': 'MTL',
+                'Senators': 'OTT',
+                'Sabres': 'BUF',
+                'Red Wings': 'DET',
+                'Rangers': 'NYR',
+                'Islanders': 'NYI',
+                'Devils': 'NJD',
+                'Penguins': 'PIT',
+                'Capitals': 'WSH',
+                'Flyers': 'PHI',
+                'Blue Jackets': 'CBJ',
+                'Hurricanes': 'CAR',
+                'Predators': 'NSH',
+                'Jets': 'WPG',
+                'Wild': 'MIN',
+                'Avalanche': 'COL',
+                'Stars': 'DAL',
+                'Blackhawks': 'CHI',
+                'Blues': 'STL',
+                'Golden Knights': 'VGK',
+                'Oilers': 'EDM',
+                'Flames': 'CGY',
+                'Canucks': 'VAN',
+                'Kraken': 'SEA',
+                'Sharks': 'SJS',
+                'Ducks': 'ANA',
+                'Kings': 'LAK',
+                'Coyotes': 'ARI'
+            };
+            
+            // Find the abbreviation from full name
+            if (opponentFullName) {
+                for (const [key, abbrev] of Object.entries(teamMappings)) {
+                    if (opponentFullName.includes(key)) {
+                        opponentAbbrev = abbrev;
+                        matchedOpponent = opponentFullName;
+                        break;
+                    }
+                }
+            }
+            
+            if (!opponentAbbrev) return null;
+            
+            h2hGames = allGames.filter(game => game.opponentAbbrev === opponentAbbrev);
+            
+            if (h2hGames.length === 0) return null;
+            
+            let totalGoals = 0;
+            let totalAssists = 0;
+            let totalPoints = 0;
+            let totalShots = 0;
+            
+            h2hGames.forEach(game => {
+                totalGoals += game.goals || 0;
+                totalAssists += game.assists || 0;
+                totalPoints += game.points || 0;
+                totalShots += game.shots || 0;
+            });
+            
+            return {
+                games: h2hGames.length,
+                avgGoals: (totalGoals / h2hGames.length).toFixed(2),
+                avgAssists: (totalAssists / h2hGames.length).toFixed(2),
+                avgPoints: (totalPoints / h2hGames.length).toFixed(2),
+                avgShots: (totalShots / h2hGames.length).toFixed(2),
+                totalGoals,
+                totalAssists,
+                totalPoints,
+                opponentAbbrev,
+                opponentName: matchedOpponent
+            };
+        }
+
+        function calculateH2HHitRate(allGames, opponentFullName, lineValue) {
+            // Find opponent abbreviation
+            const teamMappings = {
+                'Maple Leafs': 'TOR', 'Bruins': 'BOS', 'Lightning': 'TBL', 'Panthers': 'FLA',
+                'Canadiens': 'MTL', 'Senators': 'OTT', 'Sabres': 'BUF', 'Red Wings': 'DET',
+                'Rangers': 'NYR', 'Islanders': 'NYI', 'Devils': 'NJD', 'Penguins': 'PIT',
+                'Capitals': 'WSH', 'Flyers': 'PHI', 'Blue Jackets': 'CBJ', 'Hurricanes': 'CAR',
+                'Predators': 'NSH', 'Jets': 'WPG', 'Wild': 'MIN', 'Avalanche': 'COL',
+                'Stars': 'DAL', 'Blackhawks': 'CHI', 'Blues': 'STL', 'Golden Knights': 'VGK',
+                'Oilers': 'EDM', 'Flames': 'CGY', 'Canucks': 'VAN', 'Kraken': 'SEA',
+                'Sharks': 'SJS', 'Ducks': 'ANA', 'Kings': 'LAK', 'Coyotes': 'ARI'
+            };
+            
+            let opponentAbbrev = null;
+            for (const [key, abbrev] of Object.entries(teamMappings)) {
+                if (opponentFullName.includes(key)) {
+                    opponentAbbrev = abbrev;
+                    break;
+                }
+            }
+            
+            if (!opponentAbbrev) return 0;
+            
+            const h2hGames = allGames.filter(game => game.opponentAbbrev === opponentAbbrev);
+            
+            if (h2hGames.length === 0) return 0;
+            
+            let hits = 0;
+            h2hGames.forEach(game => {
+                let statValue = 0;
+                if (currentStatType === 'points') statValue = game.points || 0;
+                else if (currentStatType === 'goals') statValue = game.goals || 0;
+                else if (currentStatType === 'assists') statValue = game.assists || 0;
+                else if (currentStatType === 'shots') statValue = game.shots || 0;
+                
+                if (statValue > lineValue) hits++;
+            });
+            
+            return (hits / h2hGames.length) * 100;
         }
 
         function closeModal() {
