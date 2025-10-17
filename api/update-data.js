@@ -9,8 +9,7 @@ export default async function handler(req, res) {
 
   try {
     console.log('Starting daily NHL data update...');
-    const startTime = Date.now();
-    const season = '20252026';
+    const season = '20252026'; // 2025-26 NHL Season
 
     // Step 1: Fetch ALL player stats (paginated)
     console.log('Fetching all player stats...');
@@ -35,56 +34,38 @@ export default async function handler(req, res) {
     }
 
     const playersWithGames = allPlayers.filter(p => (p.gamesPlayed || 0) > 0);
-    console.log(`Found ${playersWithGames.length} active players (${Date.now() - startTime}ms)`);
+    console.log(`Found ${playersWithGames.length} active players`);
 
-    // Step 2: Fetch ALL goalie stats (paginated)
-    console.log('Fetching all goalie stats...');
-    let allGoalies = [];
-    start = 0;
-    hasMore = true;
+    // Step 2: Fetch game logs
+    const gameLogsData = {};
+    let successCount = 0;
+    let errorCount = 0;
 
-    while (hasMore) {
-      const goalieUrl = `https://api.nhle.com/stats/rest/en/goalie/summary?limit=${limit}&start=${start}&cayenneExp=seasonId=${season}`;
-      const goalieResponse = await fetch(goalieUrl);
-      const goalieData = await goalieResponse.json();
-      const goalies = goalieData.data || [];
-
-      if (goalies.length === 0) {
-        hasMore = false;
-      } else {
-        allGoalies = allGoalies.concat(goalies);
-        start += limit;
-        if (goalies.length < limit) hasMore = false;
-      }
+    const batchSize = 50;
+    for (let i = 0; i < playersWithGames.length; i += batchSize) {
+      const batch = playersWithGames.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async player => {
+          try {
+            const gameLogUrl = `https://api-web.nhle.com/v1/player/${player.playerId}/game-log/${season}/2`;
+            const gameLogResponse = await fetch(gameLogUrl);
+            if (gameLogResponse.ok) {
+              const gameLog = await gameLogResponse.json();
+              if (gameLog?.gameLog?.length > 0) {
+                gameLogsData[player.playerId] = gameLog;
+                successCount++;
+              } else errorCount++;
+            } else errorCount++;
+          } catch (e) {
+            errorCount++;
+          }
+        })
+      );
+      if (i + batchSize < playersWithGames.length) await new Promise(r => setTimeout(r, 500));
     }
 
-    const goaliesWithGames = allGoalies.filter(g => (g.gamesPlayed || 0) > 0);
-    console.log(`Found ${goaliesWithGames.length} active goalies (${Date.now() - startTime}ms)`);
-
-    // Step 3: Fetch team stats for shot volume rankings
-    console.log('Fetching team stats...');
-    const teamStatsUrl = `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=${season}`;
-    const teamStatsResponse = await fetch(teamStatsUrl);
-    const teamStatsData = await teamStatsResponse.json();
-    const teamStats = teamStatsData.data || [];
-
-    // Calculate shots per game and rank teams
-    const teamShotData = teamStats.map(team => ({
-      abbrev: team.teamCommonName || team.teamFullName,
-      teamFullName: team.teamFullName,
-      shotsPerGame: (team.shotsForPerGame || 0),
-      gamesPlayed: team.gamesPlayed || 0
-    })).sort((a, b) => b.shotsPerGame - a.shotsPerGame);
-
-    // Add rank (1 = most shots)
-    teamShotData.forEach((team, index) => {
-      team.rank = index + 1;
-    });
-
-    console.log(`Loaded stats for ${teamShotData.length} teams (${Date.now() - startTime}ms)`);
-
-    // Step 4: Fetch betting odds
-    console.log('Fetching betting odds...');
+    // Step 3: Fetch betting odds
+    console.log('Fetching betting odds from The Odds API...');
     let bettingOdds = {};
     let oddsError = null;
 
@@ -93,37 +74,29 @@ export default async function handler(req, res) {
       if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
         const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}`;
         const eventsResponse = await fetch(eventsUrl);
-        
-        if (!eventsResponse.ok) {
-          throw new Error(`Events API error ${eventsResponse.status}`);
-        }
+        if (!eventsResponse.ok) throw new Error(`Events API error ${eventsResponse.status}`);
 
         const events = await eventsResponse.json();
+        const today = new Date().toISOString().split('T')[0];
         
-        // Get games in next 48 hours
-        const now = new Date();
-        const fortyEightHoursFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+        // Get games for today and tomorrow (to handle timezone issues and late games)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         
         const upcomingGames = events.filter(e => {
-          const gameTime = new Date(e.commence_time);
-          return gameTime >= now && gameTime <= fortyEightHoursFromNow;
+          const gameDate = new Date(e.commence_time).toISOString().split('T')[0];
+          return gameDate === today || gameDate === tomorrowStr;
         });
 
-        console.log(`Found ${upcomingGames.length} upcoming games`);
+        console.log(`Fetching props for ${upcomingGames.length} upcoming games (today + tomorrow)`);
 
-        // Fetch all props in parallel
         const gamePromises = upcomingGames.map(async event => {
           const eventId = event.id;
-          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,goalie_saves&oddsFormat=american`;
-          
-          try {
-            const propsResponse = await fetch(propsUrl);
-            if (!propsResponse.ok) return null;
-            const data = await propsResponse.json();
-            return { event, data };
-          } catch (e) {
-            return null;
-          }
+          const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal&oddsFormat=american`;
+          const propsResponse = await fetch(propsUrl);
+          if (!propsResponse.ok) return null;
+          return { event, data: await propsResponse.json() };
         });
 
         const allPropsData = await Promise.all(gamePromises);
@@ -166,16 +139,9 @@ export default async function handler(req, res) {
                     game: `${event.home_team} vs ${event.away_team}`,
                     gameTime: event.commence_time
                   };
-                } else if (market.key === 'goalie_saves' && !bettingOdds[playerName].saves) {
-                  bettingOdds[playerName].saves = {
-                    line: outcome.point,
-                    odds: outcome.price,
-                    bookmaker: bookmaker.title,
-                    game: `${event.home_team} vs ${event.away_team}`,
-                    gameTime: event.commence_time
-                  };
                 }
               } else if (market.key === 'player_goal_scorer_anytime' && outcome.name === 'Yes') {
+                // Store anytime goal scorer as goals with 0.5 line
                 if (!bettingOdds[playerName].goals) {
                   bettingOdds[playerName].goals = {
                     line: 0.5,
@@ -191,7 +157,7 @@ export default async function handler(req, res) {
           });
         }
 
-        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players (${Date.now() - startTime}ms)`);
+        console.log(`Loaded betting lines for ${Object.keys(bettingOdds).length} players`);
       } else {
         oddsError = 'ODDS_API_KEY not set';
       }
@@ -200,105 +166,17 @@ export default async function handler(req, res) {
       console.error('Odds error:', error);
     }
 
-    // Step 5: Fetch ALL player game logs
-    console.log('Fetching game logs for ALL players...');
-    const gameLogsData = {};
-    let successCount = 0;
-    let errorCount = 0;
-
-    const batchSize = 100;
-    for (let i = 0; i < playersWithGames.length; i += batchSize) {
-      const batch = playersWithGames.slice(i, i + batchSize);
-      
-      const results = await Promise.allSettled(
-        batch.map(async player => {
-          const gameLogUrl = `https://api-web.nhle.com/v1/player/${player.playerId}/game-log/${season}/2`;
-          const response = await fetch(gameLogUrl);
-          if (response.ok) {
-            const gameLog = await response.json();
-            if (gameLog?.gameLog?.length > 0) {
-              return { playerId: player.playerId, gameLog };
-            }
-          }
-          throw new Error('No data');
-        })
-      );
-      
-      results.forEach(result => {
-        if (result.status === 'fulfilled') {
-          gameLogsData[result.value.playerId] = result.value.gameLog;
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      });
-      
-      console.log(`Processed ${Math.min(i + batchSize, playersWithGames.length)}/${playersWithGames.length} players`);
-      
-      if (i + batchSize < playersWithGames.length) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-
-    console.log(`Player game logs: ${successCount} success, ${errorCount} errors (${Date.now() - startTime}ms)`);
-
-    // Step 6: Fetch ALL goalie game logs
-    console.log('Fetching game logs for ALL goalies...');
-    const goalieGameLogsData = {};
-    let goalieSuccessCount = 0;
-    let goalieErrorCount = 0;
-
-    for (let i = 0; i < goaliesWithGames.length; i += batchSize) {
-      const batch = goaliesWithGames.slice(i, i + batchSize);
-      
-      const goalieResults = await Promise.allSettled(
-        batch.map(async goalie => {
-          const gameLogUrl = `https://api-web.nhle.com/v1/player/${goalie.playerId}/game-log/${season}/2`;
-          const response = await fetch(gameLogUrl);
-          if (response.ok) {
-            const gameLog = await response.json();
-            if (gameLog?.gameLog?.length > 0) {
-              return { playerId: goalie.playerId, gameLog };
-            }
-          }
-          throw new Error('No data');
-        })
-      );
-      
-      goalieResults.forEach(result => {
-        if (result.status === 'fulfilled') {
-          goalieGameLogsData[result.value.playerId] = result.value.gameLog;
-          goalieSuccessCount++;
-        } else {
-          goalieErrorCount++;
-        }
-      });
-      
-      console.log(`Processed ${Math.min(i + batchSize, goaliesWithGames.length)}/${goaliesWithGames.length} goalies`);
-      
-      if (i + batchSize < goaliesWithGames.length) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-
-    console.log(`Goalie game logs: ${goalieSuccessCount} success, ${goalieErrorCount} errors (${Date.now() - startTime}ms)`);
-
-    // Step 7: Save to Vercel Blob
+    // Step 4: Save to Vercel Blob
     const cacheData = {
       lastUpdated: new Date().toISOString(),
       season,
       allPlayers: playersWithGames,
-      allGoalies: goaliesWithGames,
       gameLogs: gameLogsData,
-      goalieGameLogs: goalieGameLogsData,
-      teamShotData: teamShotData,
       bettingOdds,
       stats: {
         totalPlayers: playersWithGames.length,
-        totalGoalies: goaliesWithGames.length,
         gameLogsLoaded: successCount,
-        goalieLogsLoaded: goalieSuccessCount,
-        errors: errorCount + goalieErrorCount,
+        errors: errorCount,
         bettingLinesLoaded: Object.keys(bettingOdds).length,
         oddsError
       }
@@ -309,14 +187,10 @@ export default async function handler(req, res) {
       addRandomSuffix: false
     });
 
-    const totalTime = Date.now() - startTime;
-    console.log(`Total execution time: ${totalTime}ms`);
-
     return res.status(200).json({
       success: true,
       message: 'NHL data updated successfully',
       lastUpdated: cacheData.lastUpdated,
-      executionTime: `${totalTime}ms`,
       stats: cacheData.stats,
       blobUrl: blob.url
     });
