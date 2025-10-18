@@ -111,8 +111,13 @@ export default async function handler(req, res) {
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const todayEnd = new Date(todayStart.getTime() + (24 * 60 * 60 * 1000));
         
+        // Format dates without milliseconds (API requires YYYY-MM-DDTHH:MM:SSZ format)
+        const formatDate = (date) => date.toISOString().split('.')[0] + 'Z';
+        const commenceTimeFrom = formatDate(todayStart);
+        const commenceTimeTo = formatDate(todayEnd);
+        
         // Step 4a: Get events list with time filters (FREE - doesn't cost credits!)
-        const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}&commenceTimeFrom=${todayStart.toISOString()}&commenceTimeTo=${todayEnd.toISOString()}`;
+        const eventsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events?apiKey=${oddsApiKey}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`;
         
         console.log('Fetching today\'s events list (free call)...');
         const eventsResponse = await fetch(eventsUrl);
