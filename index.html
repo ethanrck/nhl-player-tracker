@@ -1236,9 +1236,9 @@
                         
                         if (oppTeamData) {
                             const mascot = teamMascots[oppTeamName] || opponent;
-                            let badgeColor = '#27ae60'; // green (good defense - low shots against)
+                            let badgeColor = '#e74c3c'; // red (good defense - low shots against - BAD for shooters)
                             if (oppTeamData.defensiveRank <= 10) {
-                                badgeColor = '#e74c3c'; // red (bad defense - high shots against - GOOD for shooters)
+                                badgeColor = '#27ae60'; // green (bad defense - high shots against - GOOD for shooters)
                             } else if (oppTeamData.defensiveRank <= 22) {
                                 badgeColor = '#f39c12'; // orange (medium defense)
                             }
@@ -1388,6 +1388,26 @@
                                 return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 Opponent Shot Volume: #${oppTeamData.rank} (${oppTeamData.shotsPerGame.toFixed(1)} shots/game)</div>`;
                             }
                             return '';
+                        })() : !isGoalieMode && currentStatType === 'shots' && nextOpponent ? (() => {
+                            const teamMascots = {
+                                'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
+                                'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
+                                'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
+                                'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
+                                'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
+                                'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
+                                'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                                'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
+                                'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
+                                'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
+                                'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
+                            };
+                            const oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
+                            if (oppTeamData) {
+                                const mascot = teamMascots[nextOpponent] || nextOpponent;
+                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game</div>`;
+                            }
+                            return '';
                         })() : ''}
                     </div>
                 ` : ''}
@@ -1423,6 +1443,11 @@
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
                         💡 Rankings shown next to opponents indicate their shot volume rank (1 = most shots/game, 32 = fewest)<br>
                         🔴 Red = High volume (1-10) | 🟠 Orange = Medium volume (11-22) | 🟢 Green = Low volume (23-32)
+                    </div>
+                ` : currentStatType === 'shots' ? `
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
+                        💡 Badges show shots opponent allows per game (their defensive weakness)<br>
+                        🟢 Green = Weak defense, allows most shots (GOOD for shooters) | 🟠 Orange = Average | 🔴 Red = Strong defense, allows few shots (BAD for shooters)
                     </div>
                 ` : ''}
             `;
