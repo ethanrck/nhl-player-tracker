@@ -172,12 +172,28 @@ export default async function handler(req, res) {
           const { event, data: propsData } = result;
 
           const bookmaker = propsData.bookmakers?.[0];
-          if (!bookmaker) continue;
+          if (!bookmaker) {
+            console.log(`[DEBUG] No bookmakers for event ${event.id}`);
+            continue;
+          }
+
+          console.log(`[DEBUG] Processing event: ${event.home_team} vs ${event.away_team}`);
+          console.log(`[DEBUG] Bookmaker: ${bookmaker.title}`);
+          console.log(`[DEBUG] Markets available:`, bookmaker.markets?.map(m => m.key));
 
           bookmaker.markets?.forEach(market => {
+            console.log(`[DEBUG] Market: ${market.key}, Outcomes:`, market.outcomes?.length);
+            if (market.outcomes && market.outcomes.length > 0) {
+              console.log(`[DEBUG] Sample outcome:`, JSON.stringify(market.outcomes[0], null, 2));
+            }
+
             market.outcomes?.forEach(outcome => {
               const playerName = outcome.description;
-              if (!playerName) return;
+              if (!playerName) {
+                console.log(`[DEBUG] No description in outcome:`, outcome);
+                return;
+              }
+              
               if (!bettingOdds[playerName]) bettingOdds[playerName] = {};
 
               if (outcome.name === 'Over' && outcome.point !== undefined) {
@@ -189,6 +205,7 @@ export default async function handler(req, res) {
                     game: `${event.home_team} vs ${event.away_team}`,
                     gameTime: event.commence_time
                   };
+                  console.log(`[DEBUG] Added points line for ${playerName}`);
                 } else if (market.key === 'player_assists' && !bettingOdds[playerName].assists) {
                   bettingOdds[playerName].assists = {
                     line: outcome.point,
@@ -224,6 +241,7 @@ export default async function handler(req, res) {
                     gameTime: event.commence_time,
                     type: 'anytime_scorer'
                   };
+                  console.log(`[DEBUG] Added anytime goal for ${playerName}`);
                 }
               }
             });
