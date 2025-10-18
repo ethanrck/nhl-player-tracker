@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DangleData - NHL Player Line Tracker</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏒</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
     <style>
         * {
             margin: 0;
@@ -225,6 +225,9 @@
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         
         .player-card:hover {
@@ -246,6 +249,10 @@
             color: var(--text-primary);
             flex: 1;
             transition: color 0.3s ease;
+            min-height: 2.4em;
+            display: flex;
+            align-items: center;
+            line-height: 1.2;
         }
         
         .odds-line {
@@ -491,7 +498,7 @@
 <body>
     <div class="container">
         <div class="header-row">
-            <h1>🏒 DangleData</h1>
+            <h1>🎯 DangleData</h1>
             <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</button>
         </div>
         <p class="subtitle">NHL Player Line Tracker - 2025-2026 Season</p>
@@ -818,10 +825,10 @@
                     (player.goalieFullName || 'Unknown Goalie') : 
                     (player.skaterFullName || 'Unknown Player');
                 const playerOdds = bettingOdds[name];
-                const hasOdds = playerOdds && playerOdds[currentStatType];
+                const hasLine = playerOdds && playerOdds[currentStatType];
                 
                 let lineValue = 0.5;
-                if (hasOdds) {
+                if (hasLine) {
                     lineValue = playerOdds[currentStatType].line;
                 }
                 
@@ -864,14 +871,24 @@
                     hitRate = (hits / games.length) * 100;
                 }
                 
-                return { player, hasOdds, hitRate, gamesPlayed };
+                return { player, hasLine, hitRate, gamesPlayed };
             });
             
-            playersWithHitRates.sort((a, b) => {
-                if (a.hasOdds && !b.hasOdds) return -1;
-                if (!a.hasOdds && b.hasOdds) return 1;
+            // FIX: Deduplicate by player ID to remove duplicate entries
+            const seenPlayerIds = new Set();
+            const uniquePlayersWithHitRates = playersWithHitRates.filter(item => {
+                if (seenPlayerIds.has(item.player.playerId)) {
+                    return false;
+                }
+                seenPlayerIds.add(item.player.playerId);
+                return true;
+            });
+            
+            uniquePlayersWithHitRates.sort((a, b) => {
+                if (a.hasLine && !b.hasLine) return -1;
+                if (!a.hasLine && b.hasLine) return 1;
                 
-                if (a.hasOdds && b.hasOdds) {
+                if (a.hasLine && b.hasLine) {
                     if (a.gamesPlayed >= 4 && b.gamesPlayed >= 4) {
                         return b.hitRate - a.hitRate;
                     }
@@ -883,12 +900,12 @@
                 return (b.player.points || 0) - (a.player.points || 0);
             });
             
-            if (playersWithHitRates.length === 0) {
+            if (uniquePlayersWithHitRates.length === 0) {
                 container.innerHTML = '<div class="loading">No players found.</div>';
                 return;
             }
             
-            let html = playersWithHitRates.map(({player, hasOdds}) => {
+            let html = uniquePlayersWithHitRates.map(({player, hasLine}) => {
                 const name = isGoalieMode ? 
                     (player.goalieFullName || 'Unknown Goalie') : 
                     (player.skaterFullName || 'Unknown Player');
@@ -918,7 +935,7 @@
                 const playerOdds = bettingOdds[name];
                 let oddsDisplay = '';
                 
-                if (hasOdds) {
+                if (hasLine) {
                     const oddsInfo = playerOdds[currentStatType];
                     const line = oddsInfo.line;
                     const price = oddsInfo.odds;
@@ -1154,7 +1171,7 @@
                     // Get opponent shot ranking
                     const teamFullNames = {
                         'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
-                        'FLA': 'Florida Panthers', 'MTL': 'Montréal Canadiens', 'OTT': 'Ottawa Senators',
+                        'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
                         'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
                         'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
                         'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
@@ -1163,22 +1180,21 @@
                         'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
                         'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
                         'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
-                        'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Mammoth'
+                        'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
                     };
                     
                     const teamMascots = {
                         'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
-                        'Florida Panthers': 'Panthers', 'Montréal Canadiens': 'Canadiens', 'Montreal Canadiens': 'Canadiens', 
-                        'Ottawa Senators': 'Senators', 'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 
-                        'New York Rangers': 'Rangers', 'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 
-                        'Pittsburgh Penguins': 'Penguins', 'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 
-                        'Columbus Blue Jackets': 'Blue Jackets', 'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 
-                        'Winnipeg Jets': 'Jets', 'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                        'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
+                        'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
+                        'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
+                        'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
+                        'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
+                        'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
                         'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
                         'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
                         'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
-                        'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Mammoth': 'Mammoth',
-                        'Utah Hockey Club': 'Mammoth', 'Utah HC': 'Mammoth'
+                        'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
                     };
                     
                     const oppTeamName = teamFullNames[opponent];
@@ -1229,7 +1245,7 @@
                     if (currentStatType === 'shots') {
                         const teamFullNames = {
                             'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
-                            'FLA': 'Florida Panthers', 'MTL': 'Montréal Canadiens', 'OTT': 'Ottawa Senators',
+                            'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
                             'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
                             'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
                             'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
@@ -1238,22 +1254,21 @@
                             'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
                             'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
                             'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
-                            'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Mammoth'
+                            'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
                         };
                         
                         const teamMascots = {
                             'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
-                            'Florida Panthers': 'Panthers', 'Montréal Canadiens': 'Canadiens', 'Montreal Canadiens': 'Canadiens',
-                            'Ottawa Senators': 'Senators', 'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings',
-                            'New York Rangers': 'Rangers', 'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils',
-                            'Pittsburgh Penguins': 'Penguins', 'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers',
-                            'Columbus Blue Jackets': 'Blue Jackets', 'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators',
-                            'Winnipeg Jets': 'Jets', 'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                            'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
+                            'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
+                            'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
+                            'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
+                            'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
+                            'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
                             'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
                             'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
                             'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
-                            'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Mammoth': 'Mammoth',
-                            'Utah Hockey Club': 'Mammoth', 'Utah HC': 'Mammoth'
+                            'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
                         };
                         
                         const oppTeamName = teamFullNames[opponent];
@@ -1404,60 +1419,10 @@
                 
                 ${playerOdds && playerOdds[currentStatType] ? `
                     <div style="background: var(--warning-bg); padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; transition: all 0.3s ease;">
-                        <div style="font-size: 0.9em; color: var(--warning-text); margin-bottom: 5px; font-weight: 600;">📅 This Game</div>
+                        <div style="font-size: 0.9em; color: var(--warning-text); margin-bottom: 5px; font-weight: 600;">🕐 This Game</div>
                         <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${playerOdds[currentStatType].game}</div>
                         <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">${new Date(playerOdds[currentStatType].gameTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
                         <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">Odds from ${playerOdds[currentStatType].bookmaker}</div>
-                        ${isGoalieMode && nextOpponent ? (() => {
-                            const teamMappings = {
-                                'Toronto Maple Leafs': 'TOR', 'Boston Bruins': 'BOS', 'Tampa Bay Lightning': 'TBL',
-                                'Florida Panthers': 'FLA', 'Montreal Canadiens': 'MTL', 'Ottawa Senators': 'OTT',
-                                'Buffalo Sabres': 'BUF', 'Detroit Red Wings': 'DET', 'New York Rangers': 'NYR',
-                                'New York Islanders': 'NYI', 'New Jersey Devils': 'NJD', 'Pittsburgh Penguins': 'PIT',
-                                'Washington Capitals': 'WSH', 'Philadelphia Flyers': 'PHI', 'Columbus Blue Jackets': 'CBJ',
-                                'Carolina Hurricanes': 'CAR', 'Nashville Predators': 'NSH', 'Winnipeg Jets': 'WPG',
-                                'Minnesota Wild': 'MIN', 'Colorado Avalanche': 'COL', 'Dallas Stars': 'DAL',
-                                'Chicago Blackhawks': 'CHI', 'St. Louis Blues': 'STL', 'Vegas Golden Knights': 'VGK',
-                                'Edmonton Oilers': 'EDM', 'Calgary Flames': 'CGY', 'Vancouver Canucks': 'VAN',
-                                'Seattle Kraken': 'SEA', 'San Jose Sharks': 'SJS', 'Anaheim Ducks': 'ANA',
-                                'Los Angeles Kings': 'LAK', 'Arizona Coyotes': 'ARI', 'Utah Hockey Club': 'UTA'
-                            };
-                            const oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
-                            if (oppTeamData) {
-                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 Opponent Shot Volume: #${oppTeamData.rank} (${oppTeamData.shotsPerGame.toFixed(1)} shots/game)</div>`;
-                            }
-                            return '';
-                        })() : !isGoalieMode && currentStatType === 'shots' && nextOpponent ? (() => {
-                            const teamMascots = {
-                                'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
-                                'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
-                                'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
-                                'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
-                                'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
-                                'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
-                                'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
-                                'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
-                                'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
-                                'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
-                                'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
-                            };
-                            // Try to find team by full name first, then by partial match
-                            let oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
-                            
-                            if (!oppTeamData) {
-                                oppTeamData = teamShotData.find(t => 
-                                    t.teamFullName.includes(nextOpponent.split(' ').pop()) ||
-                                    nextOpponent.includes(t.teamFullName) ||
-                                    normalizeTeamName(t.teamFullName) === normalizeTeamName(nextOpponent)
-                                );
-                            }
-                            
-                            if (oppTeamData) {
-                                const mascot = teamMascots[nextOpponent] || teamMascots[oppTeamData.teamFullName] || nextOpponent.split(' ').pop();
-                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game | ${getOrdinal(oppTeamData.defensiveRank)} most</div>`;
-                            }
-                            return '';
-                        })() : ''}
                     </div>
                 ` : ''}
                 
@@ -1488,17 +1453,6 @@
                         ${gameRows}
                     </tbody>
                 </table>
-                ${isGoalieMode ? `
-                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
-                        💡 Rankings shown next to opponents indicate their shot volume rank (1 = most shots/game, 32 = fewest)<br>
-                        🔴 Red = High volume (1-10) | 🟠 Orange = Medium volume (11-22) | 🟢 Green = Low volume (23-32)
-                    </div>
-                ` : currentStatType === 'shots' ? `
-                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; font-style: italic;">
-                        💡 Badges show shots opponent allows per game (their defensive weakness)<br>
-                        🟢 Green = Weak defense, allows most shots (GOOD for shooters) | 🟠 Orange = Average | 🔴 Red = Strong defense, allows few shots (BAD for shooters)
-                    </div>
-                ` : ''}
             `;
 
             document.getElementById('gameLogModal').style.display = 'block';
