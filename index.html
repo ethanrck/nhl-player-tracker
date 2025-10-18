@@ -1169,7 +1169,17 @@
                     };
                     
                     const oppTeamName = teamFullNames[opponent];
-                    const oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                    // Try to find team by full name first, then by partial match
+                    let oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                    
+                    // Fallback: try to match by abbreviation or partial name
+                    if (!oppTeamData) {
+                        oppTeamData = teamShotData.find(t => 
+                            t.abbrev === opponent || 
+                            t.teamFullName.includes(opponent) ||
+                            oppTeamName.includes(t.abbrev)
+                        );
+                    }
                     
                     let shotRankBadge = '';
                     if (oppTeamData) {
@@ -1232,10 +1242,20 @@
                         };
                         
                         const oppTeamName = teamFullNames[opponent];
-                        const oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                        // Try to find team by full name first, then by partial match
+                        let oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                        
+                        // Fallback: try to match by abbreviation or partial name
+                        if (!oppTeamData) {
+                            oppTeamData = teamShotData.find(t => 
+                                t.abbrev === opponent || 
+                                t.teamFullName.includes(opponent) ||
+                                oppTeamName.includes(t.abbrev)
+                            );
+                        }
                         
                         if (oppTeamData) {
-                            const mascot = teamMascots[oppTeamName] || opponent;
+                            const mascot = teamMascots[oppTeamName] || teamMascots[oppTeamData.teamFullName] || opponent;
                             let badgeColor = '#e74c3c'; // red (good defense - low shots against - BAD for shooters)
                             if (oppTeamData.defensiveRank <= 10) {
                                 badgeColor = '#27ae60'; // green (bad defense - high shots against - GOOD for shooters)
@@ -1243,6 +1263,9 @@
                                 badgeColor = '#f39c12'; // orange (medium defense)
                             }
                             oppDefenseInfo = ` <span style="background: ${badgeColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)}/g</span>`;
+                        } else {
+                            // Debug: log when we can't find a team
+                            console.log(`Could not find team data for: ${opponent} / ${oppTeamName}`);
                         }
                     }
                     
@@ -1402,9 +1425,18 @@
                                 'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
                                 'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
                             };
-                            const oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
+                            // Try to find team by full name first, then by partial match
+                            let oppTeamData = teamShotData.find(t => t.teamFullName === nextOpponent);
+                            
+                            if (!oppTeamData) {
+                                oppTeamData = teamShotData.find(t => 
+                                    t.teamFullName.includes(nextOpponent.split(' ').pop()) ||
+                                    nextOpponent.includes(t.teamFullName)
+                                );
+                            }
+                            
                             if (oppTeamData) {
-                                const mascot = teamMascots[nextOpponent] || nextOpponent;
+                                const mascot = teamMascots[nextOpponent] || teamMascots[oppTeamData.teamFullName] || nextOpponent.split(' ').pop();
                                 return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game</div>`;
                             }
                             return '';
