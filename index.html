@@ -761,6 +761,18 @@
             if (hitRate >= 30) return 'hit-rate-medium';
             return 'hit-rate-poor';
         }
+        
+        // Normalize team names to handle accent variations
+        function normalizeTeamName(name) {
+            return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        }
+        
+        // Convert number to ordinal (1st, 2nd, 3rd, etc.)
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
 
         function getOpponentFromGame(gameString, playerTeam) {
             // gameString format: "Team A vs Team B"
@@ -1142,7 +1154,7 @@
                     // Get opponent shot ranking
                     const teamFullNames = {
                         'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
-                        'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
+                        'FLA': 'Florida Panthers', 'MTL': 'Montréal Canadiens', 'OTT': 'Ottawa Senators',
                         'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
                         'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
                         'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
@@ -1151,33 +1163,35 @@
                         'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
                         'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
                         'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
-                        'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
+                        'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Mammoth'
                     };
                     
                     const teamMascots = {
                         'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
-                        'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
-                        'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
-                        'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
-                        'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
-                        'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
-                        'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                        'Florida Panthers': 'Panthers', 'Montréal Canadiens': 'Canadiens', 'Montreal Canadiens': 'Canadiens', 
+                        'Ottawa Senators': 'Senators', 'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 
+                        'New York Rangers': 'Rangers', 'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 
+                        'Pittsburgh Penguins': 'Penguins', 'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 
+                        'Columbus Blue Jackets': 'Blue Jackets', 'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 
+                        'Winnipeg Jets': 'Jets', 'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
                         'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
                         'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
                         'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
-                        'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
+                        'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Mammoth': 'Mammoth',
+                        'Utah Hockey Club': 'Mammoth', 'Utah HC': 'Mammoth'
                     };
                     
                     const oppTeamName = teamFullNames[opponent];
                     // Try to find team by full name first, then by partial match
                     let oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
                     
-                    // Fallback: try to match by abbreviation or partial name
+                    // Fallback: try to match by abbreviation, partial name, or normalized name (handles accents)
                     if (!oppTeamData) {
                         oppTeamData = teamShotData.find(t => 
                             t.abbrev === opponent || 
                             t.teamFullName.includes(opponent) ||
-                            oppTeamName.includes(t.abbrev)
+                            oppTeamName.includes(t.abbrev) ||
+                            normalizeTeamName(t.teamFullName) === normalizeTeamName(oppTeamName)
                         );
                     }
                     
@@ -1215,7 +1229,7 @@
                     if (currentStatType === 'shots') {
                         const teamFullNames = {
                             'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
-                            'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
+                            'FLA': 'Florida Panthers', 'MTL': 'Montréal Canadiens', 'OTT': 'Ottawa Senators',
                             'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
                             'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
                             'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
@@ -1224,33 +1238,35 @@
                             'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
                             'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
                             'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
-                            'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
+                            'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Mammoth'
                         };
                         
                         const teamMascots = {
                             'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
-                            'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
-                            'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
-                            'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
-                            'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
-                            'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
-                            'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                            'Florida Panthers': 'Panthers', 'Montréal Canadiens': 'Canadiens', 'Montreal Canadiens': 'Canadiens',
+                            'Ottawa Senators': 'Senators', 'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings',
+                            'New York Rangers': 'Rangers', 'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils',
+                            'Pittsburgh Penguins': 'Penguins', 'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers',
+                            'Columbus Blue Jackets': 'Blue Jackets', 'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators',
+                            'Winnipeg Jets': 'Jets', 'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
                             'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
                             'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
                             'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
-                            'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
+                            'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Mammoth': 'Mammoth',
+                            'Utah Hockey Club': 'Mammoth', 'Utah HC': 'Mammoth'
                         };
                         
                         const oppTeamName = teamFullNames[opponent];
                         // Try to find team by full name first, then by partial match
                         let oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
                         
-                        // Fallback: try to match by abbreviation or partial name
+                        // Fallback: try to match by abbreviation, partial name, or normalized name (handles accents)
                         if (!oppTeamData) {
                             oppTeamData = teamShotData.find(t => 
                                 t.abbrev === opponent || 
                                 t.teamFullName.includes(opponent) ||
-                                oppTeamName.includes(t.abbrev)
+                                oppTeamName.includes(t.abbrev) ||
+                                normalizeTeamName(t.teamFullName) === normalizeTeamName(oppTeamName)
                             );
                         }
                         
@@ -1431,13 +1447,14 @@
                             if (!oppTeamData) {
                                 oppTeamData = teamShotData.find(t => 
                                     t.teamFullName.includes(nextOpponent.split(' ').pop()) ||
-                                    nextOpponent.includes(t.teamFullName)
+                                    nextOpponent.includes(t.teamFullName) ||
+                                    normalizeTeamName(t.teamFullName) === normalizeTeamName(nextOpponent)
                                 );
                             }
                             
                             if (oppTeamData) {
                                 const mascot = teamMascots[nextOpponent] || teamMascots[oppTeamData.teamFullName] || nextOpponent.split(' ').pop();
-                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game</div>`;
+                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game, ${getOrdinal(oppTeamData.defensiveRank)} most</div>`;
                             }
                             return '';
                         })() : ''}
