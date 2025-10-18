@@ -216,6 +216,7 @@
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             margin-top: 20px;
+            padding-bottom: 100px;
         }
         
         .player-card {
@@ -534,23 +535,34 @@
             <div class="loading">Loading all players from cache...</div>
         </div>
         
-        <!-- Ad Space 2: Bottom Banner -->
-        <div id="ad-bottom-banner" style="text-align: center; margin: 30px 0 20px 0; padding: 15px; background: var(--card-bg); border-radius: 8px; min-height: 90px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); border: 2px dashed var(--input-border);">
-            <div>📢 Ad Space - 728x90 Banner</div>
+        <div id="playersContainer" class="players-grid">
+            <div class="loading">Loading all players from cache...</div>
         </div>
         
-        <!-- Ad Space 3: Sidebar (optional, for desktop) -->
-        <div id="ad-sidebar" style="position: fixed; right: 20px; top: 100px; width: 160px; background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; color: var(--text-secondary); border: 2px dashed var(--input-border); display: none;">
-            <div style="font-size: 12px;">📢 Ad Space<br>160x600<br>Skyscraper</div>
+        <!-- Watchlist Section -->
+        <div id="watchlistSection" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--container-bg); border-top: 3px solid var(--button-active-bg); box-shadow: 0 -5px 20px rgba(0,0,0,0.3); z-index: 999; display: none; transition: all 0.3s ease;">
+            <div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer;" onclick="toggleWatchlistSection()">
+                    <h3 style="margin: 0; color: var(--text-primary);">📋 My Watchlist (<span id="watchlistCount">0</span>)</h3>
+                    <button id="watchlistToggle" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-primary);">▼</button>
+                </div>
+                <div id="parlayCalculator" style="display: none; margin-bottom: 20px;"></div>
+                <div id="watchlistItems" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto;"></div>
+            </div>
         </div>
         
-        <style>
-            @media (min-width: 1600px) {
-                #ad-sidebar {
-                    display: block !important;
-                }
-            }
-        </style>
+        </div>
+        
+        <!-- Watchlist Section -->
+        <div id="watchlistSection" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--container-bg); border-top: 3px solid var(--button-active-bg); box-shadow: 0 -5px 20px rgba(0,0,0,0.3); z-index: 999; display: none; transition: all 0.3s ease;">
+            <div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer;" onclick="toggleWatchlistSection()">
+                    <h3 style="margin: 0; color: var(--text-primary);">📋 My Watchlist (<span id="watchlistCount">0</span>)</h3>
+                    <button id="watchlistToggle" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-primary);">▼</button>
+                </div>
+                <div id="watchlistItems" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
     </div>
     
     <div id="gameLogModal" class="game-log-modal">
@@ -573,6 +585,223 @@
         let bettingOdds = {};
         let currentStatType = 'points';
         let isGoalieMode = false;
+        let watchlist = [];
+        let selectedForParlay = [];
+
+        // Load watchlist from localStorage
+        function loadWatchlist() {
+            const saved = localStorage.getItem('dangledata_watchlist');
+            if (saved) {
+                watchlist = JSON.parse(saved);
+                updateWatchlistDisplay();
+            }
+        }
+
+        // Save watchlist to localStorage
+        function saveWatchlist() {
+            localStorage.setItem('dangledata_watchlist', JSON.stringify(watchlist));
+            updateWatchlistDisplay();
+        }
+
+        // Toggle player in watchlist
+        function toggleWatchlist(playerId, playerName) {
+            const index = watchlist.findIndex(p => p.id === playerId);
+            if (index > -1) {
+                watchlist.splice(index, 1);
+                // Remove from parlay selection if it was selected
+                selectedForParlay = selectedForParlay.filter(id => id !== playerId);
+            } else {
+                watchlist.push({ id: playerId, name: playerName, stat: currentStatType });
+            }
+            saveWatchlist();
+            displayPlayers(); // Refresh to update button states
+        }
+
+        // Check if player is in watchlist
+        function isInWatchlist(playerId) {
+            return watchlist.some(p => p.id === playerId);
+        }
+
+        // Toggle player selection for parlay
+        function toggleParlaySelection(playerId) {
+            const index = selectedForParlay.indexOf(playerId);
+            if (index > -1) {
+                selectedForParlay.splice(index, 1);
+            } else {
+                selectedForParlay.push(playerId);
+            }
+            updateWatchlistDisplay();
+        }
+
+        // Convert American odds to decimal
+        function americanToDecimal(americanOdds) {
+            if (americanOdds > 0) {
+                return (americanOdds / 100) + 1;
+            } else {
+                return (100 / Math.abs(americanOdds)) + 1;
+            }
+        }
+
+        // Convert decimal odds to American
+        function decimalToAmerican(decimalOdds) {
+            if (decimalOdds >= 2) {
+                return '+' + Math.round((decimalOdds - 1) * 100);
+            } else {
+                return Math.round(-100 / (decimalOdds - 1));
+            }
+        }
+
+        // Calculate parlay odds
+        function calculateParlay() {
+            if (selectedForParlay.length === 0) return null;
+            
+            let totalDecimalOdds = 1;
+            const legs = [];
+            
+            selectedForParlay.forEach(playerId => {
+                const item = watchlist.find(w => w.id === playerId);
+                if (!item) return;
+                
+                const playerSource = isGoalieMode ? allGoaliesData : allPlayersData;
+                const player = playerSource.find(p => p.playerId === item.id);
+                if (!player) return;
+                
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown') : 
+                    (player.skaterFullName || 'Unknown');
+                const playerOdds = bettingOdds[name];
+                
+                if (playerOdds && playerOdds[item.stat]) {
+                    const odds = playerOdds[item.stat];
+                    const decimalOdds = americanToDecimal(odds.odds);
+                    totalDecimalOdds *= decimalOdds;
+                    
+                    legs.push({
+                        name,
+                        stat: item.stat,
+                        line: odds.line,
+                        odds: odds.odds
+                    });
+                }
+            });
+            
+            if (legs.length === 0) return null;
+            
+            return {
+                legs,
+                decimalOdds: totalDecimalOdds,
+                americanOdds: decimalToAmerican(totalDecimalOdds),
+                legCount: legs.length
+            };
+        }
+
+        // Update watchlist display at bottom
+        function updateWatchlistDisplay() {
+            const watchlistContainer = document.getElementById('watchlistItems');
+            const watchlistSection = document.getElementById('watchlistSection');
+            const watchlistCount = document.getElementById('watchlistCount');
+            
+            watchlistCount.textContent = watchlist.length;
+            
+            if (watchlist.length === 0) {
+                watchlistSection.style.display = 'none';
+                return;
+            }
+            
+            watchlistSection.style.display = 'block';
+            
+            const items = watchlist.map(item => {
+                const playerSource = isGoalieMode ? allGoaliesData : allPlayersData;
+                const player = playerSource.find(p => p.playerId === item.id);
+                
+                if (!player) return '';
+                
+                const name = isGoalieMode ? 
+                    (player.goalieFullName || 'Unknown') : 
+                    (player.skaterFullName || 'Unknown');
+                const playerOdds = bettingOdds[name];
+                const hasOdds = playerOdds && playerOdds[item.stat];
+                
+                let oddsInfo = '';
+                if (hasOdds) {
+                    const odds = playerOdds[item.stat];
+                    const formattedOdds = odds.odds > 0 ? `+${odds.odds}` : odds.odds;
+                    if (item.stat === 'goals' && odds.type === 'anytime_scorer') {
+                        oddsInfo = `Anytime Goal ${formattedOdds}`;
+                    } else {
+                        oddsInfo = `O/U ${odds.line} ${formattedOdds}`;
+                    }
+                }
+                
+                // Get hit rate
+                const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
+                const gameLog = gameLogSource[player.playerId];
+                let hitRate = 'N/A';
+                
+                if (gameLog && playerOdds && playerOdds[item.stat]) {
+                    const lineValue = playerOdds[item.stat].line;
+                    let games = gameLog.gameLog;
+                    if (isGoalieMode) {
+                        games = games.filter(game => {
+                            const shotsAgainst = game.shotsAgainst || 0;
+                            const gamesStarted = game.gamesStarted || 0;
+                            return gamesStarted > 0 || shotsAgainst > 0;
+                        });
+                    }
+                    games = games.slice(0, 10);
+                    
+                    let hits = 0;
+                    games.forEach(game => {
+                        let statValue = 0;
+                        if (isGoalieMode) {
+                            const shotsAgainst = game.shotsAgainst || 0;
+                            const goalsAgainst = game.goalsAgainst || 0;
+                            statValue = shotsAgainst - goalsAgainst;
+                        } else {
+                            if (item.stat === 'points') statValue = game.points || 0;
+                            else if (item.stat === 'goals') statValue = game.goals || 0;
+                            else if (item.stat === 'assists') statValue = game.assists || 0;
+                            else if (item.stat === 'shots') statValue = game.shots || 0;
+                        }
+                        if (statValue > lineValue) hits++;
+                    });
+                    
+                    if (games.length > 0) {
+                        hitRate = `${((hits / games.length) * 100).toFixed(0)}% (${hits}/${games.length})`;
+                    }
+                }
+                
+                return `
+                    <div style="background: var(--card-bg); padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 2px solid var(--input-border);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 5px;">${name}</div>
+                            <div style="font-size: 0.85em; color: var(--text-secondary);">${item.stat.toUpperCase()} • ${oddsInfo || 'No line'}</div>
+                            <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 3px;">Hit Rate: ${hitRate}</div>
+                        </div>
+                        <button onclick="toggleWatchlist(${item.id}, '${name}')" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">Remove</button>
+                    </div>
+                `;
+            }).filter(Boolean).join('');
+            
+            watchlistContainer.innerHTML = items || '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">No players in watchlist</div>';
+        }
+
+        // Toggle watchlist visibility
+        function toggleWatchlistSection() {
+            const items = document.getElementById('watchlistItems');
+            const parlay = document.getElementById('parlayCalculator');
+            const toggle = document.getElementById('watchlistToggle');
+            const isHidden = items.style.display === 'none';
+            items.style.display = isHidden ? 'grid' : 'none';
+            parlay.style.display = isHidden && selectedForParlay.length > 0 ? 'block' : 'none';
+            toggle.textContent = isHidden ? '▼' : '▲';
+        }
+
+        // Clear all parlay selections
+        function clearParlaySelections() {
+            selectedForParlay = [];
+            updateWatchlistDisplay();
+        }
 
         // Dark mode toggle
         function toggleDarkMode() {
@@ -591,6 +820,7 @@
                 document.body.classList.add('dark-mode');
                 document.querySelector('.dark-mode-toggle').textContent = '☀️ Light Mode';
             }
+            loadWatchlist();
             loadCachedData();
         };
 
@@ -931,6 +1161,24 @@
                     }
                 }
                 
+                const inWatchlist = isInWatchlist(player.playerId);
+                const watchlistButton = `
+                    <button onclick="event.stopPropagation(); toggleWatchlist(${player.playerId}, '${name.replace(/'/g, "\\'")}')" 
+                            style="background: ${inWatchlist ? '#27ae60' : 'var(--button-bg)'}; 
+                                   color: ${inWatchlist ? 'white' : 'var(--button-text)'}; 
+                                   border: 2px solid ${inWatchlist ? '#27ae60' : 'var(--button-text)'}; 
+                                   border-radius: 6px; 
+                                   padding: 6px 12px; 
+                                   cursor: pointer; 
+                                   font-weight: 600; 
+                                   font-size: 0.85em;
+                                   margin-top: 10px;
+                                   width: 100%;
+                                   transition: all 0.3s;">
+                        ${inWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist'}
+                    </button>
+                `;
+                
                 return `
                     <div class="player-card" onclick="showGameLog(${player.playerId})">
                         <div class="player-header">
@@ -955,6 +1203,7 @@
                         <div class="hit-rate-display" id="hitrate-${player.playerId}">
                             <div class="stat-label">Calculating...</div>
                         </div>
+                        ${watchlistButton}
                     </div>
                 `;
             }).join('');
