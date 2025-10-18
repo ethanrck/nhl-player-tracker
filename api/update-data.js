@@ -103,20 +103,23 @@ export default async function handler(req, res) {
     try {
       const oddsApiKey = process.env.ODDS_API_KEY;
       if (oddsApiKey && oddsApiKey !== 'YOUR_ODDS_API_KEY_HERE') {
-        // Filter for today's games using commenceTimeFrom/To parameters
+        // Define today's time range for filtering
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const todayEnd = new Date(todayStart.getTime() + (24 * 60 * 60 * 1000));
         
-        // SINGLE API CALL for all games and all markets!
+        // SINGLE API CALL for all upcoming games and all markets!
         // Cost: 5 markets × 1 region = 5 credits total (instead of 44+ per old method!)
-        const oddsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,player_total_saves&oddsFormat=american&commenceTimeFrom=${todayStart.toISOString()}&commenceTimeTo=${todayEnd.toISOString()}`;
+        // Note: /odds endpoint returns upcoming games by default, we'll filter client-side
+        const oddsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,player_total_saves&oddsFormat=american`;
         
         console.log('Calling optimized odds endpoint (single call for all games)...');
         const oddsResponse = await fetch(oddsUrl);
         
         if (!oddsResponse.ok) {
-          throw new Error(`Odds API error ${oddsResponse.status}`);
+          const errorText = await oddsResponse.text();
+          console.error('Odds API error response:', errorText);
+          throw new Error(`Odds API error ${oddsResponse.status}: ${errorText}`);
         }
 
         // Check response headers for credit usage
@@ -126,8 +129,15 @@ export default async function handler(req, res) {
         console.log(`💰 Credits - Remaining: ${remaining}, Used: ${used}, This Call Cost: ${lastCost}`);
         oddsCreditsUsed = { remaining: parseInt(remaining), used: parseInt(used), lastCost: parseInt(lastCost) };
 
-        const gamesData = await oddsResponse.json();
-        console.log(`Found ${gamesData.length} games today with odds`);
+        const allGamesData = await oddsResponse.json();
+        
+        // Filter to only today's games
+        const gamesData = allGamesData.filter(game => {
+          const gameTime = new Date(game.commence_time);
+          return gameTime >= todayStart && gameTime < todayEnd;
+        });
+        
+        console.log(`Found ${gamesData.length} games today (${allGamesData.length} total upcoming) with odds`);
 
         // Set nextGameTime to the first game
         if (gamesData.length > 0) {
