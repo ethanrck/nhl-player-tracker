@@ -92,7 +92,7 @@ export default async function handler(req, res) {
 
     console.log(`Loaded stats for ${teamShotData.length} teams (${Date.now() - startTime}ms)`);
 
-    // Step 4: Fetch betting odds
+    // Step 4: Fetch betting odds (TODAY'S GAMES ONLY)
     console.log('Fetching betting odds...');
     let bettingOdds = {};
     let oddsError = null;
@@ -110,48 +110,29 @@ export default async function handler(req, res) {
 
         const events = await eventsResponse.json();
         
-        // Get games in next 48 hours
+        // Get only TODAY's games
         const now = new Date();
-        const fortyEightHoursFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayEnd = new Date(todayStart.getTime() + (24 * 60 * 60 * 1000));
         
-        const upcomingGames = events.filter(e => {
+        const todaysGames = events.filter(e => {
           const gameTime = new Date(e.commence_time);
-          return gameTime >= now && gameTime <= fortyEightHoursFromNow;
+          return gameTime >= todayStart && gameTime < todayEnd;
         });
 
-        console.log(`Found ${upcomingGames.length} upcoming games`);
+        console.log(`Found ${todaysGames.length} games today`);
 
-        // Find the first game of TODAY
-        if (upcomingGames.length > 0) {
-          const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const todayEnd = new Date(todayStart.getTime() + (24 * 60 * 60 * 1000));
-          
-          // Filter for games happening today
-          const todaysGames = upcomingGames.filter(e => {
-            const gameTime = new Date(e.commence_time);
-            return gameTime >= todayStart && gameTime < todayEnd;
-          });
-          
-          if (todaysGames.length > 0) {
-            // Sort by time and get the earliest game today
-            const sortedTodaysGames = todaysGames.sort((a, b) => 
-              new Date(a.commence_time) - new Date(b.commence_time)
-            );
-            nextGameTime = sortedTodaysGames[0].commence_time;
-            console.log(`First game today: ${new Date(nextGameTime).toLocaleString()} (${todaysGames.length} total games today)`);
-          } else {
-            // No games today, find first game tomorrow or later
-            const sortedGames = upcomingGames.sort((a, b) => 
-              new Date(a.commence_time) - new Date(b.commence_time)
-            );
-            nextGameTime = sortedGames[0].commence_time;
-            console.log(`No games today. Next game: ${new Date(nextGameTime).toLocaleString()}`);
-          }
+        // Set nextGameTime to the first game today
+        if (todaysGames.length > 0) {
+          const sortedTodaysGames = todaysGames.sort((a, b) => 
+            new Date(a.commence_time) - new Date(b.commence_time)
+          );
+          nextGameTime = sortedTodaysGames[0].commence_time;
+          console.log(`First game today: ${new Date(nextGameTime).toLocaleString()}`);
         }
 
-        // Fetch all props in parallel
-        const gamePromises = upcomingGames.map(async event => {
+        // Fetch all props in parallel for today's games only
+        const gamePromises = todaysGames.map(async event => {
           const eventId = event.id;
           const propsUrl = `https://api.the-odds-api.com/v4/sports/icehockey_nhl/events/${eventId}/odds?apiKey=${oddsApiKey}&regions=us&markets=player_points,player_goal_scorer_anytime,player_assists,player_shots_on_goal,player_total_saves&oddsFormat=american`;
           
