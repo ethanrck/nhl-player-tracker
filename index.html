@@ -1454,7 +1454,7 @@
                             
                             if (oppTeamData) {
                                 const mascot = teamMascots[nextOpponent] || teamMascots[oppTeamData.teamFullName] || nextOpponent.split(' ').pop();
-                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game, ${getOrdinal(oppTeamData.defensiveRank)} most</div>`;
+                                return `<div style="font-size: 0.95em; color: var(--text-primary); margin-top: 8px; font-weight: 600;">🎯 ${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)} shots/game | ${getOrdinal(oppTeamData.defensiveRank)} most</div>`;
                             }
                             return '';
                         })() : ''}
