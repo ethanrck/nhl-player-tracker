@@ -226,27 +226,12 @@
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
-            position: relative;
         }
         
         .player-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             border-color: var(--card-hover-border);
-        }
-        
-        .pin-icon {
-            cursor: pointer;
-            font-size: 20px;
-            transition: all 0.3s;
-            position: absolute;
-            top: 15px;
-            right: 50%;
-            transform: translateX(50%);
-        }
-        
-        .pin-icon:hover {
-            transform: translateX(50%) scale(1.2);
         }
         
         .player-header {
@@ -635,6 +620,11 @@
             }
             saveWatchlist();
             displayPlayers(); // Refresh to update button states
+            
+            // If modal is open, refresh it to show updated button state
+            if (document.getElementById('gameLogModal').style.display === 'block') {
+                showGameLog(playerId);
+            }
         }
 
         // Check if player is in watchlist
@@ -1181,19 +1171,8 @@
                     }
                 }
                 
-                const inWatchlist = isInWatchlist(player.playerId);
-                const pinIcon = `
-                    <div class="pin-icon" 
-                         onclick="event.stopPropagation(); toggleWatchlist(${player.playerId}, '${name.replace(/'/g, "\\'")}')" 
-                         style="opacity: ${inWatchlist ? '1' : '0.4'};"
-                         title="${inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}">
-                        ${inWatchlist ? '📌' : '📍'}
-                    </div>
-                `;
-                
                 return `
                     <div class="player-card" onclick="showGameLog(${player.playerId})">
-                        ${pinIcon}
                         <div class="player-header">
                             <div class="player-name">${name}</div>
                             ${oddsDisplay}
@@ -1225,78 +1204,94 @@
         }
 
         function updateAllHitRates() {
-            filteredPlayers.forEach(player => {
-                try {
-                    const name = isGoalieMode ? 
-                        (player.goalieFullName || 'Unknown Goalie') : 
-                        (player.skaterFullName || 'Unknown Player');
-                    const playerOdds = bettingOdds[name];
-                    let lineValue = 0.5;
+            // Use requestAnimationFrame to prevent blocking
+            requestAnimationFrame(() => {
+                const batchSize = 20;
+                let currentIndex = 0;
+                
+                function processBatch() {
+                    const batch = filteredPlayers.slice(currentIndex, currentIndex + batchSize);
                     
-                    if (playerOdds && playerOdds[currentStatType]) {
-                        lineValue = playerOdds[currentStatType].line;
-                    }
-                    
-                    const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
-                    const gameLog = gameLogSource[player.playerId];
-                    
-                    const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
-                    
-                    if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
-                        if (hitRateDiv) {
-                            hitRateDiv.innerHTML = `<div class="stat-label">No game log available</div>`;
-                        }
-                        playerHitRates[player.playerId] = 0;
-                        return;
-                    }
+                    batch.forEach(player => {
+                        try {
+                            const name = isGoalieMode ? 
+                                (player.goalieFullName || 'Unknown Goalie') : 
+                                (player.skaterFullName || 'Unknown Player');
+                            const playerOdds = bettingOdds[name];
+                            let lineValue = 0.5;
+                            
+                            if (playerOdds && playerOdds[currentStatType]) {
+                                lineValue = playerOdds[currentStatType].line;
+                            }
+                            
+                            const gameLogSource = isGoalieMode ? allGoalieGameLogs : allGameLogs;
+                            const gameLog = gameLogSource[player.playerId];
+                            
+                            const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                            
+                            if (!hitRateDiv) return; // Skip if element doesn't exist
+                            
+                            if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
+                                hitRateDiv.innerHTML = `<div class="stat-label">No game log available</div>`;
+                                playerHitRates[player.playerId] = 0;
+                                return;
+                            }
 
-                    // Filter games - for goalies, only include games where they actually played
-                    let games = gameLog.gameLog;
-                    if (isGoalieMode) {
-                        games = games.filter(game => {
-                            const shotsAgainst = game.shotsAgainst || 0;
-                            const gamesStarted = game.gamesStarted || 0;
-                            return gamesStarted > 0 || shotsAgainst > 0;
-                        });
-                    }
-                    games = games.slice(0, 10);
-                    let hits = 0;
+                            // Filter games - for goalies, only include games where they actually played
+                            let games = gameLog.gameLog;
+                            if (isGoalieMode) {
+                                games = games.filter(game => {
+                                    const shotsAgainst = game.shotsAgainst || 0;
+                                    const gamesStarted = game.gamesStarted || 0;
+                                    return gamesStarted > 0 || shotsAgainst > 0;
+                                });
+                            }
+                            games = games.slice(0, 10);
+                            let hits = 0;
 
-                    games.forEach(game => {
-                        let statValue = 0;
-                        if (isGoalieMode) {
-                            // Calculate saves: shots against - goals against
-                            const shotsAgainst = game.shotsAgainst || 0;
-                            const goalsAgainst = game.goalsAgainst || 0;
-                            statValue = shotsAgainst - goalsAgainst;
-                        } else {
-                            if (currentStatType === 'points') statValue = game.points || 0;
-                            else if (currentStatType === 'goals') statValue = game.goals || 0;
-                            else if (currentStatType === 'assists') statValue = game.assists || 0;
-                            else if (currentStatType === 'shots') statValue = game.shots || 0;
+                            games.forEach(game => {
+                                let statValue = 0;
+                                if (isGoalieMode) {
+                                    const shotsAgainst = game.shotsAgainst || 0;
+                                    const goalsAgainst = game.goalsAgainst || 0;
+                                    statValue = shotsAgainst - goalsAgainst;
+                                } else {
+                                    if (currentStatType === 'points') statValue = game.points || 0;
+                                    else if (currentStatType === 'goals') statValue = game.goals || 0;
+                                    else if (currentStatType === 'assists') statValue = game.assists || 0;
+                                    else if (currentStatType === 'shots') statValue = game.shots || 0;
+                                }
+                                
+                                if (statValue > lineValue) hits++;
+                            });
+
+                            const hitRate = games.length > 0 ? ((hits / games.length) * 100).toFixed(1) : 0;
+                            playerHitRates[player.playerId] = parseFloat(hitRate);
+                            
+                            const colorClass = getHitRateColor(parseFloat(hitRate));
+                            
+                            hitRateDiv.innerHTML = `
+                                <div class="stat-label">Last ${games.length} Games vs ${lineValue}</div>
+                                <div class="hit-rate-value ${colorClass}">${hitRate}% (${hits}/${games.length})</div>
+                            `;
+                        } catch (error) {
+                            console.error(`Error calculating hit rate for player ${player.playerId}:`, error);
+                            const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
+                            if (hitRateDiv) {
+                                hitRateDiv.innerHTML = `<div class="stat-label">Error</div>`;
+                            }
                         }
-                        
-                        if (statValue > lineValue) hits++;
                     });
-
-                    const hitRate = games.length > 0 ? ((hits / games.length) * 100).toFixed(1) : 0;
-                    playerHitRates[player.playerId] = parseFloat(hitRate);
                     
-                    const colorClass = getHitRateColor(parseFloat(hitRate));
+                    currentIndex += batchSize;
                     
-                    if (hitRateDiv) {
-                        hitRateDiv.innerHTML = `
-                            <div class="stat-label">Last ${games.length} Games vs ${lineValue}</div>
-                            <div class="hit-rate-value ${colorClass}">${hitRate}% (${hits}/${games.length})</div>
-                        `;
-                    }
-                } catch (error) {
-                    console.error(`Error calculating hit rate for player ${player.playerId}:`, error);
-                    const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
-                    if (hitRateDiv) {
-                        hitRateDiv.innerHTML = `<div class="stat-label">Error loading hit rate</div>`;
+                    // Process next batch
+                    if (currentIndex < filteredPlayers.length) {
+                        requestAnimationFrame(processBatch);
                     }
                 }
+                
+                processBatch();
             });
         }
 
@@ -1571,6 +1566,15 @@
             const hitRate = ((hits / games.length) * 100).toFixed(1);
             const colorClass = getHitRateColor(parseFloat(hitRate));
             
+            // Watchlist pin button
+            const inWatchlist = isInWatchlist(playerId);
+            const watchlistPin = `
+                <button onclick="toggleWatchlist(${playerId}, '${name.replace(/'/g, "\\'")}')" 
+                        style="position: absolute; top: 15px; right: 60px; background: ${inWatchlist ? '#27ae60' : 'var(--button-bg)'}; color: ${inWatchlist ? 'white' : 'var(--button-text)'}; border: 2px solid ${inWatchlist ? '#27ae60' : 'var(--button-text)'}; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-weight: 600; font-size: 0.9em; transition: all 0.3s;">
+                    ${inWatchlist ? '📌 In Watchlist' : '📍 Add to Watchlist'}
+                </button>
+            `;
+            
             // Calculate H2H stats if we have a next opponent
             let h2hSection = '';
             if (nextOpponent) {
@@ -1652,6 +1656,7 @@
 
             const modalContent = document.getElementById('modalContent');
             modalContent.innerHTML = `
+                ${watchlistPin}
                 <h2>${name}</h2>
                 <p>${player.teamAbbrevs} - ${isGoalieMode ? 'G' : player.positionCode}</p>
                 
