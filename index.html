@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DangleData</title>
+    <title>DangleData - NHL Player Line Tracker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏒</text></svg>">
     <style>
         * {
@@ -154,7 +154,7 @@
             transition: color 0.3s ease;
         }
         
-        input[type="text"], input[type="checkbox"] {
+        input[type="text"], input[type="checkbox"], select {
             padding: 10px;
             font-size: 16px;
             border: 2px solid var(--input-border);
@@ -162,6 +162,15 @@
             background: var(--container-bg);
             color: var(--text-primary);
             transition: all 0.3s ease;
+        }
+        
+        select {
+            cursor: pointer;
+        }
+        
+        select option {
+            background: var(--container-bg);
+            color: var(--text-primary);
         }
         
         input[type="checkbox"] {
@@ -485,6 +494,7 @@
             <h1>🏒 DangleData</h1>
             <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</button>
         </div>
+        <p class="subtitle">NHL Player Line Tracker - 2025-2026 Season</p>
         
         <div class="api-status" id="apiStatus">
             📊 Loading cached data...
@@ -494,6 +504,13 @@
             <div class="control-group search-box">
                 <label>Search Player:</label>
                 <input type="text" id="searchPlayer" placeholder="Type player name..." oninput="filterPlayers()" style="flex-grow: 1;">
+            </div>
+            
+            <div class="control-group">
+                <label>Filter by Game:</label>
+                <select id="gameFilter" onchange="filterPlayers()" style="padding: 10px; font-size: 16px; border: 2px solid var(--input-border); border-radius: 8px; background: var(--container-bg); color: var(--text-primary); min-width: 250px;">
+                    <option value="">All Games</option>
+                </select>
             </div>
             
             <div class="control-group">
@@ -611,11 +628,64 @@
                 
                 // Apply initial filter based on checkbox state
                 filterPlayers();
+                
+                // Populate game filter dropdown
+                populateGameFilter();
 
             } catch (error) {
                 container.innerHTML = `<div class="error"><strong>Error loading cached data:</strong> ${error.message}</div>`;
                 console.error('Error:', error);
             }
+        }
+
+        function populateGameFilter() {
+            const gameFilter = document.getElementById('gameFilter');
+            const uniqueGames = new Set();
+            
+            // Extract all unique games from betting odds
+            Object.values(bettingOdds).forEach(playerOdds => {
+                Object.values(playerOdds).forEach(statOdds => {
+                    if (statOdds.game) {
+                        uniqueGames.add(statOdds.game);
+                    }
+                });
+            });
+            
+            // Sort games by time
+            const gamesWithTime = Array.from(uniqueGames).map(game => {
+                // Find the game time from any player who has odds for this game
+                let gameTime = null;
+                for (const playerOdds of Object.values(bettingOdds)) {
+                    for (const statOdds of Object.values(playerOdds)) {
+                        if (statOdds.game === game) {
+                            gameTime = new Date(statOdds.gameTime);
+                            break;
+                        }
+                    }
+                    if (gameTime) break;
+                }
+                return { game, gameTime };
+            }).sort((a, b) => a.gameTime - b.gameTime);
+            
+            // Clear existing options except "All Games"
+            gameFilter.innerHTML = '<option value="">All Games</option>';
+            
+            // Add game options with time
+            gamesWithTime.forEach(({ game, gameTime }) => {
+                const option = document.createElement('option');
+                option.value = game;
+                const timeStr = gameTime.toLocaleString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: '2-digit' 
+                });
+                option.textContent = `${game} - ${timeStr}`;
+                gameFilter.appendChild(option);
+            });
+            
+            console.log(`Populated ${uniqueGames.size} games in filter`);
         }
 
         function selectStat(stat) {
@@ -646,12 +716,17 @@
                 filteredPlayers = [...allPlayersData];
             }
             
+            // Reset game filter when switching stats
+            document.getElementById('gameFilter').value = '';
+            populateGameFilter();
+            
             filterPlayers();
         }
 
         function filterPlayers() {
             const searchTerm = document.getElementById('searchPlayer').value.toLowerCase();
             const hideNoLines = document.getElementById('hideNoLines').checked;
+            const selectedGame = document.getElementById('gameFilter').value;
             
             const sourceData = isGoalieMode ? allGoaliesData : allPlayersData;
             
@@ -668,7 +743,13 @@
                 const hasLine = playerOdds && playerOdds[currentStatType];
                 const passesLineFilter = !hideNoLines || hasLine;
                 
-                return matchesSearch && passesLineFilter;
+                // Game filter
+                let passesGameFilter = true;
+                if (selectedGame && playerOdds && playerOdds[currentStatType]) {
+                    passesGameFilter = playerOdds[currentStatType].game === selectedGame;
+                }
+                
+                return matchesSearch && passesLineFilter && passesGameFilter;
             });
             
             displayPlayers();
