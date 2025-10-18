@@ -69,17 +69,25 @@ export default async function handler(req, res) {
     const teamStatsData = await teamStatsResponse.json();
     const teamStats = teamStatsData.data || [];
 
-    // Calculate shots per game and rank teams
+    // Calculate shots per game (offensive) and shots against per game (defensive) and rank teams
     const teamShotData = teamStats.map(team => ({
       abbrev: team.teamCommonName || team.teamFullName,
       teamFullName: team.teamFullName,
       shotsPerGame: (team.shotsForPerGame || 0),
+      shotsAgainstPerGame: (team.shotsAgainstPerGame || 0),
       gamesPlayed: team.gamesPlayed || 0
     })).sort((a, b) => b.shotsPerGame - a.shotsPerGame);
 
-    // Add rank (1 = most shots)
+    // Add rank (1 = most shots FOR)
     teamShotData.forEach((team, index) => {
       team.rank = index + 1;
+    });
+    
+    // Add defensive rank (1 = allows most shots AGAINST - worst defense)
+    const sortedByDefense = [...teamShotData].sort((a, b) => b.shotsAgainstPerGame - a.shotsAgainstPerGame);
+    sortedByDefense.forEach((team, index) => {
+      const originalTeam = teamShotData.find(t => t.teamFullName === team.teamFullName);
+      originalTeam.defensiveRank = index + 1;
     });
 
     console.log(`Loaded stats for ${teamShotData.length} teams (${Date.now() - startTime}ms)`);
