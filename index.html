@@ -1154,6 +1154,20 @@
                         'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
                     };
                     
+                    const teamMascots = {
+                        'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
+                        'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
+                        'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
+                        'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
+                        'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
+                        'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
+                        'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                        'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
+                        'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
+                        'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
+                        'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
+                    };
+                    
                     const oppTeamName = teamFullNames[opponent];
                     const oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
                     
@@ -1186,11 +1200,56 @@
                         </tr>
                     `;
                 } else {
-                    // Skater row
+                    // Skater row - add opponent defensive info for shots stat
+                    let oppDefenseInfo = '';
+                    if (currentStatType === 'shots') {
+                        const teamFullNames = {
+                            'TOR': 'Toronto Maple Leafs', 'BOS': 'Boston Bruins', 'TBL': 'Tampa Bay Lightning',
+                            'FLA': 'Florida Panthers', 'MTL': 'Montreal Canadiens', 'OTT': 'Ottawa Senators',
+                            'BUF': 'Buffalo Sabres', 'DET': 'Detroit Red Wings', 'NYR': 'New York Rangers',
+                            'NYI': 'New York Islanders', 'NJD': 'New Jersey Devils', 'PIT': 'Pittsburgh Penguins',
+                            'WSH': 'Washington Capitals', 'PHI': 'Philadelphia Flyers', 'CBJ': 'Columbus Blue Jackets',
+                            'CAR': 'Carolina Hurricanes', 'NSH': 'Nashville Predators', 'WPG': 'Winnipeg Jets',
+                            'MIN': 'Minnesota Wild', 'COL': 'Colorado Avalanche', 'DAL': 'Dallas Stars',
+                            'CHI': 'Chicago Blackhawks', 'STL': 'St. Louis Blues', 'VGK': 'Vegas Golden Knights',
+                            'EDM': 'Edmonton Oilers', 'CGY': 'Calgary Flames', 'VAN': 'Vancouver Canucks',
+                            'SEA': 'Seattle Kraken', 'SJS': 'San Jose Sharks', 'ANA': 'Anaheim Ducks',
+                            'LAK': 'Los Angeles Kings', 'ARI': 'Arizona Coyotes', 'UTA': 'Utah Hockey Club'
+                        };
+                        
+                        const teamMascots = {
+                            'Toronto Maple Leafs': 'Maple Leafs', 'Boston Bruins': 'Bruins', 'Tampa Bay Lightning': 'Lightning',
+                            'Florida Panthers': 'Panthers', 'Montreal Canadiens': 'Canadiens', 'Ottawa Senators': 'Senators',
+                            'Buffalo Sabres': 'Sabres', 'Detroit Red Wings': 'Red Wings', 'New York Rangers': 'Rangers',
+                            'New York Islanders': 'Islanders', 'New Jersey Devils': 'Devils', 'Pittsburgh Penguins': 'Penguins',
+                            'Washington Capitals': 'Capitals', 'Philadelphia Flyers': 'Flyers', 'Columbus Blue Jackets': 'Blue Jackets',
+                            'Carolina Hurricanes': 'Hurricanes', 'Nashville Predators': 'Predators', 'Winnipeg Jets': 'Jets',
+                            'Minnesota Wild': 'Wild', 'Colorado Avalanche': 'Avalanche', 'Dallas Stars': 'Stars',
+                            'Chicago Blackhawks': 'Blackhawks', 'St. Louis Blues': 'Blues', 'Vegas Golden Knights': 'Golden Knights',
+                            'Edmonton Oilers': 'Oilers', 'Calgary Flames': 'Flames', 'Vancouver Canucks': 'Canucks',
+                            'Seattle Kraken': 'Kraken', 'San Jose Sharks': 'Sharks', 'Anaheim Ducks': 'Ducks',
+                            'Los Angeles Kings': 'Kings', 'Arizona Coyotes': 'Coyotes', 'Utah Hockey Club': 'Hockey Club'
+                        };
+                        
+                        const oppTeamName = teamFullNames[opponent];
+                        const oppTeamData = teamShotData.find(t => t.teamFullName === oppTeamName);
+                        
+                        if (oppTeamData) {
+                            const mascot = teamMascots[oppTeamName] || opponent;
+                            let badgeColor = '#27ae60'; // green (good defense - low shots against)
+                            if (oppTeamData.defensiveRank <= 10) {
+                                badgeColor = '#e74c3c'; // red (bad defense - high shots against - GOOD for shooters)
+                            } else if (oppTeamData.defensiveRank <= 22) {
+                                badgeColor = '#f39c12'; // orange (medium defense)
+                            }
+                            oppDefenseInfo = ` <span style="background: ${badgeColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">${mascot} allow ${oppTeamData.shotsAgainstPerGame.toFixed(1)}/g</span>`;
+                        }
+                    }
+                    
                     return `
                         <tr class="${hit ? 'hit' : 'miss'}">
                             <td>${gameDate}</td>
-                            <td>${homeAway} ${opponent}</td>
+                            <td>${homeAway} ${opponent}${oppDefenseInfo}</td>
                             <td>${game.goals || 0}</td>
                             <td>${game.assists || 0}</td>
                             <td>${game.points || 0}</td>
