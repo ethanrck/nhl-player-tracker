@@ -216,7 +216,6 @@
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             margin-top: 20px;
-            padding-bottom: 100px;
         }
         
         .player-card {
@@ -539,17 +538,41 @@
             <div class="loading">Loading all players from cache...</div>
         </div>
         
-        <!-- Watchlist Section -->
-        <div id="watchlistSection" style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--container-bg); border-top: 3px solid var(--button-active-bg); box-shadow: 0 -5px 20px rgba(0,0,0,0.3); z-index: 999; display: none; transition: all 0.3s ease;">
-            <div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; cursor: pointer;" onclick="toggleWatchlistSection()">
-                    <h3 style="margin: 0; color: var(--text-primary);">📋 My Watchlist (<span id="watchlistCount">0</span>)</h3>
-                    <button id="watchlistToggle" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-primary);">▼</button>
+        <!-- Watchlist Section - Compact Corner Popup -->
+        <div id="watchlistSection" style="position: fixed; bottom: 20px; right: 20px; width: 400px; max-height: 600px; background: var(--container-bg); border: 3px solid var(--button-active-bg); border-radius: 12px; box-shadow: 0 5px 30px rgba(0,0,0,0.4); z-index: 999; display: none; transition: all 0.3s ease; overflow: hidden;">
+            <div style="background: var(--button-active-bg); color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0; font-size: 1em; cursor: pointer;" onclick="toggleWatchlistSection()">📋 Watchlist (<span id="watchlistCount">0</span>)</h4>
+                <div style="display: flex; gap: 8px;">
+                    <button id="watchlistToggle" onclick="toggleWatchlistSection()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: white;">▼</button>
+                    <button onclick="hideWatchlist()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: white;" title="Minimize">−</button>
                 </div>
-                <div id="parlayCalculator" style="display: none; margin-bottom: 20px;"></div>
-                <div id="watchlistItems" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto;"></div>
+            </div>
+            <div id="watchlistContent" style="max-height: 550px; overflow-y: auto;">
+                <div id="parlayCalculator" style="display: none; padding: 15px; border-bottom: 2px solid var(--input-border);"></div>
+                <div id="watchlistItems" style="padding: 10px;"></div>
             </div>
         </div>
+        
+        <!-- Watchlist Toggle Button (when collapsed) -->
+        <button id="watchlistFloatingButton" onclick="showWatchlist()" style="position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--button-active-bg); color: white; border: none; font-size: 24px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 998; display: none; transition: all 0.3s;">
+            📋<span id="floatingCount" style="position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;">0</span>
+        </button>
+        
+        <script>
+        function showWatchlist() {
+            document.getElementById('watchlistSection').style.display = 'block';
+            document.getElementById('watchlistFloatingButton').style.display = 'none';
+            document.getElementById('watchlistContent').style.display = 'block';
+            document.getElementById('watchlistToggle').textContent = '▼';
+        }
+        
+        function hideWatchlist() {
+            if (watchlist.length > 0) {
+                document.getElementById('watchlistSection').style.display = 'none';
+                document.getElementById('watchlistFloatingButton').style.display = 'flex';
+            }
+        }
+        </script>
         
         </div>
         
@@ -593,8 +616,8 @@
             const saved = localStorage.getItem('dangledata_watchlist');
             if (saved) {
                 watchlist = JSON.parse(saved);
-                updateWatchlistDisplay();
             }
+            updateWatchlistDisplay();
         }
 
         // Save watchlist to localStorage
@@ -798,13 +821,17 @@
 
         // Toggle watchlist visibility
         function toggleWatchlistSection() {
-            const items = document.getElementById('watchlistItems');
-            const parlay = document.getElementById('parlayCalculator');
+            const content = document.getElementById('watchlistContent');
             const toggle = document.getElementById('watchlistToggle');
-            const isHidden = items.style.display === 'none';
-            items.style.display = isHidden ? 'grid' : 'none';
-            parlay.style.display = isHidden && selectedForParlay.length > 0 ? 'block' : 'none';
-            toggle.textContent = isHidden ? '▼' : '▲';
+            const isHidden = content.style.display === 'none';
+            
+            if (isHidden) {
+                content.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                toggle.textContent = '▲';
+            }
         }
 
         // Clear all parlay selections
@@ -1229,16 +1256,19 @@
                             
                             const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
                             
-                            if (!hitRateDiv) return; // Skip if element doesn't exist
+                            if (!hitRateDiv) {
+                                console.log(`Hit rate div not found for ${name} (${player.playerId})`);
+                                return; // Skip if element doesn't exist
+                            }
                             
-                            if (!gameLog || !gameLog.gameLog || gameLog.gameLog.length === 0) {
+                            if (!gameLog || !gameLog.gameLog || !Array.isArray(gameLog.gameLog) || gameLog.gameLog.length === 0) {
                                 hitRateDiv.innerHTML = `<div class="stat-label">No game log available</div>`;
                                 playerHitRates[player.playerId] = 0;
                                 return;
                             }
 
                             // Filter games - for goalies, only include games where they actually played
-                            let games = gameLog.gameLog;
+                            let games = [...gameLog.gameLog]; // Create a copy
                             if (isGoalieMode) {
                                 games = games.filter(game => {
                                     const shotsAgainst = game.shotsAgainst || 0;
@@ -1247,6 +1277,13 @@
                                 });
                             }
                             games = games.slice(0, 10);
+                            
+                            if (games.length === 0) {
+                                hitRateDiv.innerHTML = `<div class="stat-label">No games played</div>`;
+                                playerHitRates[player.playerId] = 0;
+                                return;
+                            }
+                            
                             let hits = 0;
 
                             games.forEach(game => {
@@ -1275,7 +1312,7 @@
                                 <div class="hit-rate-value ${colorClass}">${hitRate}% (${hits}/${games.length})</div>
                             `;
                         } catch (error) {
-                            console.error(`Error calculating hit rate for player ${player.playerId}:`, error);
+                            console.error(`Error calculating hit rate for player ${player.playerId} (${player.skaterFullName || player.goalieFullName}):`, error);
                             const hitRateDiv = document.getElementById(`hitrate-${player.playerId}`);
                             if (hitRateDiv) {
                                 hitRateDiv.innerHTML = `<div class="stat-label">Error</div>`;
